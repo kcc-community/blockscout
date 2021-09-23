@@ -10,6 +10,7 @@ defmodule Explorer.Chain do
       join: 5,
       limit: 2,
       lock: 2,
+      offset: 2,
       order_by: 2,
       order_by: 3,
       preload: 2,
@@ -100,6 +101,9 @@ defmodule Explorer.Chain do
   @revert_error_method_id "08c379a0"
 
   @burn_address_hash_str "0x0000000000000000000000000000000000000000"
+
+  @limit_showing_transaсtions 100000
+  @default_page_size 50
 
   @typedoc """
   The name of an association on the `t:Ecto.Schema.t/0`
@@ -3182,6 +3186,44 @@ defmodule Explorer.Chain do
       fetch_recent_collated_transactions(paging_options, necessity_by_association)
     end
   end
+    
+  # RAP - random access pagination
+  @spec recent_collated_transactions_for_rap([paging_options | necessity_by_association_option]) :: [Transaction.t()]
+  def recent_collated_transactions_for_rap(options \\ []) when is_list(options) do
+    necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
+    paging_options = Keyword.get(options, :paging_options, @default_paging_options)
+
+    if is_nil(paging_options.key) do
+      paging_options.page_size + 1
+      |> Transactions.take_enough()
+      |> case do
+        nil ->
+          transactions = fetch_recent_collated_transactions_for_rap(paging_options, necessity_by_association)
+          Transactions.update(transactions)
+          transactions
+
+        transactions ->
+          transactions
+      end
+    else
+      fetch_recent_collated_transactions_for_rap(paging_options, necessity_by_association)
+    end
+  end
+
+  def fetch_recent_collated_transactions_for_rap(paging_options, necessity_by_association) do
+    paging_options
+    |> fetch_transactions_for_rap()
+    |> where([transaction], not is_nil(transaction.block_number) and not is_nil(transaction.index))
+    |> join_associations(necessity_by_association)
+    |> preload([{:token_transfers, [:token, :from_address, :to_address]}])
+    |> Repo.all()
+  end
+
+  defp fetch_transactions_for_rap(paging_options) do
+    Transaction
+    |> order_by([transaction], desc: transaction.block_number, desc: transaction.index)
+    |> handle_random_access_paging_options(paging_options)
+  end
 
   def fetch_recent_collated_transactions(paging_options, necessity_by_association) do
     paging_options
@@ -4223,6 +4265,38 @@ defmodule Explorer.Chain do
     |> page_transaction(paging_options)
     |> limit(^paging_options.page_size)
   end
+
+  defp handle_random_access_paging_options(query, nil), do: query
+
+  defp handle_random_access_paging_options(query, paging_options) do
+    query
+    |> page_transaction(paging_options)
+    |> handle_page(paging_options)
+  end
+
+  defp handle_page(query, paging_options) do
+    page_number = Keyword.get(paging_options, :page_number, 1)
+    page_size = Keyword.get(paging_options, :page_size, @default_page_size)
+
+    cond do
+      page_in_bounds?(page_number, page_size) && page_number == 1 ->
+        query
+        |> limit(^page_size + 1)
+
+      page_in_bounds?(page_number, page_size) ->
+        query
+        |> limit(^page_size)
+        |> offset(^((page_number - 1) * page_size))
+
+      true ->
+        query
+        |> limit(^(@default_page_size + 1))
+    end
+  end
+
+  defp page_in_bounds?(page_number, page_size), do: page_size * page_number <= limit_shownig_transactions()
+
+  def limit_shownig_transactions, do: @limit_showing_transaсtions
 
   defp join_association(query, [{association, nested_preload}], necessity)
        when is_atom(association) and is_atom(nested_preload) do

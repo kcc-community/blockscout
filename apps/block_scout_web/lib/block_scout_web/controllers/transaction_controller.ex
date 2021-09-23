@@ -1,39 +1,55 @@
 defmodule BlockScoutWeb.TransactionController do
   use BlockScoutWeb, :controller
 
-  import BlockScoutWeb.Chain, only: [paging_options: 1, next_page_params: 3, split_list_by_page: 1]
+  import BlockScoutWeb.Chain, only: [fetch_page_number: 1, paging_options: 1, next_page_params: 3, update_page_number: 2, split_list_by_page: 1]
 
   alias BlockScoutWeb.{AccessHelpers, Controller, TransactionView}
   alias Explorer.Chain
   alias Phoenix.View
+  require Logger
 
   {:ok, burn_address_hash} = Chain.string_to_address_hash("0x0000000000000000000000000000000000000000")
   @burn_address_hash burn_address_hash
 
+  @default_options  [
+                      necessity_by_association: %{
+                        :block => :required,
+                        [created_contract_address: :names] => :optional,
+                        [from_address: :names] => :optional,
+                        [to_address: :names] => :optional
+                      }
+                    ]
+
   def index(conn, %{"type" => "JSON"} = params) do
-    full_options =
-      Keyword.merge(
-        [
-          necessity_by_association: %{
-            :block => :required,
-            [created_contract_address: :names] => :optional,
-            [from_address: :names] => :optional,
-            [to_address: :names] => :optional
-          }
-        ],
-        paging_options(params)
-      )
+    options =
+    @default_options 
+    |> Keyword.merge(paging_options(params))
+    
+    full_options = 
+      options
+      |> Keyword.put(:paging_options, 
+        params
+        |> fetch_page_number()
+        |> update_page_number(Keyword.get(options, :paging_options))) 
 
     transactions_plus_one = Chain.recent_collated_transactions(full_options)
     {transactions, next_page} = split_list_by_page(transactions_plus_one)
+    Logger.configure(truncate: :infinity)
+    Logger.debug("PARAMS1234")
+    Logger.debug(full_options)
+    page_size = Enum.count(transactions)
+    pages_limit = Chain.limit_shownig_transactions() |> div(page_size)
 
-    next_page_path =
+    next_page_params =
       case next_page_params(next_page, transactions, params) do
         nil ->
           nil
 
         next_page_params ->
-          transaction_path(conn, :index, Map.delete(next_page_params, "type"))
+          next_page_params
+          |> Map.delete("type")
+          |> Map.put("pages_limit", pages_limit)
+          |> Map.put("page_size", page_size)
       end
 
     json(
@@ -49,7 +65,7 @@ defmodule BlockScoutWeb.TransactionController do
               conn: conn
             )
           end),
-        next_page_path: next_page_path
+        next_page_params: next_page_params
       }
     )
   end
