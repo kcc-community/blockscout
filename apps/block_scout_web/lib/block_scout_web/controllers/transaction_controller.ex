@@ -6,7 +6,6 @@ defmodule BlockScoutWeb.TransactionController do
   alias BlockScoutWeb.{AccessHelpers, Controller, TransactionView}
   alias Explorer.Chain
   alias Phoenix.View
-  require Logger
 
   {:ok, burn_address_hash} = Chain.string_to_address_hash("0x0000000000000000000000000000000000000000")
   @burn_address_hash burn_address_hash
@@ -32,14 +31,17 @@ defmodule BlockScoutWeb.TransactionController do
         |> fetch_page_number()
         |> update_page_number(Keyword.get(options, :paging_options))) 
 
-    transactions_plus_one = Chain.recent_collated_transactions(full_options)
+    transactions_plus_one = Chain.recent_collated_transactions_for_rap(full_options)
     {transactions, next_page} = split_list_by_page(transactions_plus_one)
-    Logger.configure(truncate: :infinity)
-    Logger.debug("PARAMS1234")
-    Logger.debug(full_options)
-    page_size = Enum.count(transactions)
-    pages_limit = Chain.limit_shownig_transactions() |> div(page_size)
 
+    page_size = Enum.count(transactions)
+    pages_limit = 
+      if page_size != 0 do 
+        (Chain.limit_shownig_transactions() / page_size) |> Float.ceil() |> trunc()
+      else 
+        -1
+      end
+    
     next_page_params =
       case next_page_params(next_page, transactions, params) do
         nil ->

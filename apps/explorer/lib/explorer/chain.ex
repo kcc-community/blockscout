@@ -3211,18 +3211,24 @@ defmodule Explorer.Chain do
   end
 
   def fetch_recent_collated_transactions_for_rap(paging_options, necessity_by_association) do
-    paging_options
-    |> fetch_transactions_for_rap()
+    fetch_transactions_for_rap()
     |> where([transaction], not is_nil(transaction.block_number) and not is_nil(transaction.index))
+    |> handle_random_access_paging_options(paging_options)
     |> join_associations(necessity_by_association)
     |> preload([{:token_transfers, [:token, :from_address, :to_address]}])
     |> Repo.all()
   end
 
-  defp fetch_transactions_for_rap(paging_options) do
+  defp fetch_transactions_for_rap() do
     Transaction
     |> order_by([transaction], desc: transaction.block_number, desc: transaction.index)
-    |> handle_random_access_paging_options(paging_options)
+  end
+
+  defp transactions_available_count() do
+    Transaction
+      |> where([transaction], not is_nil(transaction.block_number) and not is_nil(transaction.index))
+      |> limit(^@limit_showing_transaсtions)
+      |> Repo.aggregate(:count, :hash)
   end
 
   def fetch_recent_collated_transactions(paging_options, necessity_by_association) do
@@ -4266,7 +4272,7 @@ defmodule Explorer.Chain do
     |> limit(^paging_options.page_size)
   end
 
-  defp handle_random_access_paging_options(query, nil), do: query
+  defp handle_random_access_paging_options(query, nil), do: limit(query, ^(@default_page_size + 1))
 
   defp handle_random_access_paging_options(query, paging_options) do
     query
@@ -4275,9 +4281,8 @@ defmodule Explorer.Chain do
   end
 
   defp handle_page(query, paging_options) do
-    page_number = Keyword.get(paging_options, :page_number, 1)
-    page_size = Keyword.get(paging_options, :page_size, @default_page_size)
-
+    page_number = paging_options |> Map.get(:page_number, 1) |> proccess_page_number()
+    page_size = Map.get(paging_options, :page_size, @default_page_size)
     cond do
       page_in_bounds?(page_number, page_size) && page_number == 1 ->
         query
@@ -4294,9 +4299,16 @@ defmodule Explorer.Chain do
     end
   end
 
-  defp page_in_bounds?(page_number, page_size), do: page_size * page_number <= limit_shownig_transactions()
+  defp proccess_page_number(number) when number < 1, do: 1
 
-  def limit_shownig_transactions, do: @limit_showing_transaсtions
+  defp proccess_page_number(number), do: number
+
+  defp page_in_bounds?(page_number, page_size) do
+    limit = limit_shownig_transactions()
+    (page_size < limit) && (limit - (page_number - 1) * page_size > 0)
+  end
+
+  def limit_shownig_transactions, do: transactions_available_count()
 
   defp join_association(query, [{association, nested_preload}], necessity)
        when is_atom(association) and is_atom(nested_preload) do
