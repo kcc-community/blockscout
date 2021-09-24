@@ -3192,7 +3192,6 @@ defmodule Explorer.Chain do
   def recent_collated_transactions_for_rap(options \\ []) when is_list(options) do
     necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
     paging_options = Keyword.get(options, :paging_options, @default_paging_options)
-
     if is_nil(paging_options.key) do
       paging_options.page_size + 1
       |> Transactions.take_enough()
@@ -3209,6 +3208,8 @@ defmodule Explorer.Chain do
       fetch_recent_collated_transactions_for_rap(paging_options, necessity_by_association)
     end
   end
+
+  def default_page_size, do: @default_page_size
 
   def fetch_recent_collated_transactions_for_rap(paging_options, necessity_by_association) do
     fetch_transactions_for_rap()
@@ -4286,7 +4287,7 @@ defmodule Explorer.Chain do
     cond do
       page_in_bounds?(page_number, page_size) && page_number == 1 ->
         query
-        |> limit(^page_size + 1)
+        |> limit(^(page_size + 1))
 
       page_in_bounds?(page_number, page_size) ->
         query
@@ -4303,10 +4304,7 @@ defmodule Explorer.Chain do
 
   defp proccess_page_number(number), do: number
 
-  defp page_in_bounds?(page_number, page_size) do
-    limit = limit_shownig_transactions()
-    (page_size < limit) && (limit - (page_number - 1) * page_size > 0)
-  end
+  defp page_in_bounds?(page_number, page_size), do: (page_size < @limit_showing_transaсtions) && (@limit_showing_transaсtions - (page_number - 1) * page_size > 0)
 
   def limit_shownig_transactions, do: transactions_available_count()
 

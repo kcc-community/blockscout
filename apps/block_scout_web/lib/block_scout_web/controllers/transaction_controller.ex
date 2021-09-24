@@ -1,7 +1,7 @@
 defmodule BlockScoutWeb.TransactionController do
   use BlockScoutWeb, :controller
 
-  import BlockScoutWeb.Chain, only: [fetch_page_number: 1, paging_options: 1, next_page_params: 3, update_page_number: 2, split_list_by_page: 1]
+  import BlockScoutWeb.Chain, only: [fetch_page_number: 1, paging_options: 1, next_page_params: 3, update_page_numbers: 3, split_list_by_page: 1]
 
   alias BlockScoutWeb.{AccessHelpers, Controller, TransactionView}
   alias Explorer.Chain
@@ -29,29 +29,37 @@ defmodule BlockScoutWeb.TransactionController do
       |> Keyword.put(:paging_options, 
         params
         |> fetch_page_number()
-        |> update_page_number(Keyword.get(options, :paging_options))) 
+        |> update_page_numbers(Chain.default_page_size(), Keyword.get(options, :paging_options))) 
 
     transactions_plus_one = Chain.recent_collated_transactions_for_rap(full_options)
-    {transactions, next_page} = split_list_by_page(transactions_plus_one)
-
-    page_size = Enum.count(transactions)
-    pages_limit = 
-      if page_size != 0 do 
-        (Chain.limit_shownig_transactions() / page_size) |> Float.ceil() |> trunc()
-      else 
-        -1
+    {transactions, next_page} = 
+      if fetch_page_number(params) == 1 do
+        split_list_by_page(transactions_plus_one)
+      else
+        {transactions_plus_one, nil}
       end
     
     next_page_params =
-      case next_page_params(next_page, transactions, params) do
-        nil ->
-          nil
+      if fetch_page_number(params) == 1 do
+        page_size = Enum.count(transactions)
+        pages_limit = 
+          if page_size != 0 do 
+            ((Chain.limit_shownig_transactions() / page_size) |> Float.ceil() |> trunc()) - 1
+          else 
+            -1
+          end
+        case next_page_params(next_page, transactions, params) do
+          nil ->
+            nil
 
-        next_page_params ->
-          next_page_params
-          |> Map.delete("type")
-          |> Map.put("pages_limit", pages_limit)
-          |> Map.put("page_size", page_size)
+          next_page_params ->
+            next_page_params
+            |> Map.delete("type")
+            |> Map.put("pages_limit", pages_limit)
+            |> Map.put("page_size", page_size)
+        end
+      else
+        Map.delete(params, "type")
       end
 
     json(
