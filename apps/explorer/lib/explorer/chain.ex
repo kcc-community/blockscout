@@ -102,7 +102,7 @@ defmodule Explorer.Chain do
 
   @burn_address_hash_str "0x0000000000000000000000000000000000000000"
 
-  @limit_showing_transaсtions 100000
+  @limit_showing_transaсtions 100_000
   @default_page_size 50
 
   @typedoc """
@@ -3186,14 +3186,15 @@ defmodule Explorer.Chain do
       fetch_recent_collated_transactions(paging_options, necessity_by_association)
     end
   end
-    
+
   # RAP - random access pagination
   @spec recent_collated_transactions_for_rap([paging_options | necessity_by_association_option]) :: [Transaction.t()]
   def recent_collated_transactions_for_rap(options \\ []) when is_list(options) do
     necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
     paging_options = Keyword.get(options, :paging_options, @default_paging_options)
+
     if is_nil(paging_options.key) do
-      paging_options.page_size + 1
+      (paging_options.page_size + 1)
       |> Transactions.take_enough()
       |> case do
         nil ->
@@ -3227,9 +3228,9 @@ defmodule Explorer.Chain do
 
   defp transactions_available_count() do
     Transaction
-      |> where([transaction], not is_nil(transaction.block_number) and not is_nil(transaction.index))
-      |> limit(^@limit_showing_transaсtions)
-      |> Repo.aggregate(:count, :hash)
+    |> where([transaction], not is_nil(transaction.block_number) and not is_nil(transaction.index))
+    |> limit(^@limit_showing_transaсtions)
+    |> Repo.aggregate(:count, :hash)
   end
 
   def fetch_recent_collated_transactions(paging_options, necessity_by_association) do
@@ -4284,6 +4285,7 @@ defmodule Explorer.Chain do
   defp handle_page(query, paging_options) do
     page_number = paging_options |> Map.get(:page_number, 1) |> proccess_page_number()
     page_size = Map.get(paging_options, :page_size, @default_page_size)
+
     cond do
       page_in_bounds?(page_number, page_size) && page_number == 1 ->
         query
@@ -4304,7 +4306,8 @@ defmodule Explorer.Chain do
 
   defp proccess_page_number(number), do: number
 
-  defp page_in_bounds?(page_number, page_size), do: (page_size < @limit_showing_transaсtions) && (@limit_showing_transaсtions - (page_number - 1) * page_size > 0)
+  defp page_in_bounds?(page_number, page_size),
+    do: page_size < @limit_showing_transaсtions && @limit_showing_transaсtions - (page_number - 1) * page_size > 0
 
   def limit_shownig_transactions, do: transactions_available_count()
 

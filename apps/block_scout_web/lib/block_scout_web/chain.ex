@@ -219,6 +219,7 @@ defmodule BlockScoutWeb.Chain do
     case Integer.parse(page_number_string) do
       {number, ""} ->
         number
+
       _ ->
         1
     end
