@@ -111,10 +111,10 @@ const elements = {
         if (oldState.transactionCount === state.transactionCount) return
         $el.empty().append(numeral(state.transactionCount).format() + ' Transactions')
         $el.show()
-        $el.parent('.address-detail-item').removeAttr('style')
+        $('.address-transactions-count-item').removeAttr('style')
       } else {
         $el.hide()
-        $el.parent('.address-detail-item').css('display', 'none')
+        $('.address-transactions-count-item').css('display', 'none')
       }
     }
   },
@@ -125,12 +125,12 @@ const elements = {
     render ($el, state, oldState) {
       if (state.countersFetched && state.gasUsageCount) {
         if (oldState.gasUsageCount === state.gasUsageCount) return
-        $el.empty().append(numeral(state.gasUsageCount).format() + ' Gas used')
+        $el.empty().append(numeral(state.gasUsageCount).format())
         $el.show()
-        $el.parent('.address-detail-item').removeAttr('style')
+        $('.address-gas-used-item').removeAttr('style')
       } else {
         $el.hide()
-        $el.parent('.address-detail-item').css('display', 'none')
+        $('.address-gas-used-item').css('display', 'none')
       }
     }
   },
@@ -150,10 +150,10 @@ const elements = {
     render ($el, state, oldState) {
       if (state.countersFetched && state.validationCount) {
         if (oldState.validationCount === state.validationCount) return
-        $el.empty().append(numeral(state.validationCount).format() + ' Blocks Validated')
-        $el.show()
+        $el.empty().append(numeral(state.validationCount).format())
+        $('.address-validation-count-item').removeAttr('style')
       } else {
-        $el.hide()
+        $('.address-validation-count-item').css('display', 'none')
       }
     }
   }
