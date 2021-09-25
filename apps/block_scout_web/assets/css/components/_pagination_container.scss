@@ -91,6 +91,7 @@ $pagination-page-link-color-active: #fff !default;
       user-select: none;
       text-align: center;
       white-space: nowrap;
+      cursor: pointer;
 
       &:not(.no-hover):hover {
         @include pagination-container-base($pagination-page-link-background-active, $pagination-page-link-color-active);

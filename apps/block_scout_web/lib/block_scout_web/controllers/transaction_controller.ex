@@ -63,6 +63,7 @@ defmodule BlockScoutWeb.TransactionController do
             |> Map.delete("type")
             |> Map.put("pages_limit", pages_limit)
             |> Map.put("page_size", page_size)
+            |> Map.put("page_number", 1)
         end
       else
         Map.delete(params, "type")
