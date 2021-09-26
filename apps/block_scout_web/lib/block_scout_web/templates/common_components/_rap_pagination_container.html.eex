@@ -6,9 +6,7 @@ data-pagination-container>
         <!-- Previous -->
         <li class="page-item">
             <a
-                <%= if !assigns[:prev_page_path] do %>disabled<% end %>
                 class="page-link"
-                href='<%= "#{assigns[:prev_page_path]}" %>'
                 <%= if assigns[:data_prev_page_button] do %>data-prev-page-button<% end %>
             >
                 <svg xmlns="http://www.w3.org/2000/svg" width="6" height="10">
@@ -17,15 +15,13 @@ data-pagination-container>
             </a>
         </li>
     </ul>
-    <ul class="pagination" pages-numbers-container>
+    <ul class="pagination fml5" pages-numbers-container>
     </ul>
-    <ul class="pagination">
+    <ul class="pagination fml5">
         <!-- Next -->
         <li class="page-item">
             <a
-                <%= if !assigns[:next_page_path] do %>disabled<% end %>
                 class="page-link"
-                href='<%= "#{assigns[:next_page_path]}" %>'
                 <%= if assigns[:data_next_page_button] do %>data-next-page-button<% end %>
             >
                 <svg xmlns="http://www.w3.org/2000/svg" width="6" height="10">
