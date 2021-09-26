@@ -91,8 +91,8 @@ if ($transactionListPage.length) {
   transactionsChannel.onError(() => store.dispatch({
     type: 'CHANNEL_DISCONNECTED'
   }))
-  transactionsChannel.on('transaction', batchChannel((msgs) => store.dispatch({
+  transactionsChannel.on('transaction', batchChannel((msgs) => {if (!store.getState().beyondPageOne) store.dispatch({
     type: 'RECEIVED_NEW_TRANSACTION_BATCH',
     msgs: humps.camelizeKeys(msgs)
-  })))
+  })}))
 }

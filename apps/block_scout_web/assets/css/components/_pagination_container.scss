@@ -125,6 +125,25 @@ $pagination-page-link-color-active: #fff !default;
   margin-left: 10px;
 }
 
+.mlm17 {
+  @include media-breakpoint-down(sm) {
+    margin-left: -17px;
+  }
+}
+
+.mrm18 {
+  @include media-breakpoint-down(sm) {
+    margin-right: -18px;
+  }
+}
+
+.go-to {
+  @include media-breakpoint-down(sm) {
+    margin-top: 10px !important;
+    justify-content: end !important;
+  }
+}
+
 .page-number {
   background-color: $pagination-page-link-background;
   border-width: 1px;

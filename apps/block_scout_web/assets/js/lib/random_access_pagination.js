@@ -315,7 +315,6 @@ function pagesNumbersGenerate (pagesLimit, $container, currentPageNumber) {
     }
     resultHTML += renderPaginationElement(pagesLimit, currentPageNumber == pagesLimit)
   }
-
   $container.html(resultHTML)
 }
 
