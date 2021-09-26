@@ -3044,3 +3044,8 @@ msgstr ""
 #: lib/block_scout_web/templates/transaction/_decoded_input_body.html.eex:53
 msgid "Expand"
 msgstr ""
+
+#, elixir-format
+#: lib/block_scout_web/templates/common_components/_rap_pagination_container.html.eex:32
+msgid "Go to"
+msgstr ""
