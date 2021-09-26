@@ -72,7 +72,7 @@ export function asyncReducer (state = asyncInitialState, action) {
         nextPageParams: humps.decamelizeKeys(action.nextPageParams),
         pagesLimit: parseInt(action.nextPageParams.pagesLimit),
         currentPageNumber: pageNumber,
-        beyondPageOne: pageNumber != 1
+        beyondPageOne: pageNumber !== 1
       })
     }
     default:
@@ -294,26 +294,26 @@ function pagesNumbersGenerate (pagesLimit, $container, currentPageNumber) {
   } else if (currentPageNumber < groupedPagesNumber) {
     resultHTML += renderPaginationElements(1, groupedPagesNumber, currentPageNumber)
     resultHTML += renderPaginationElement('...', false)
-    resultHTML += renderPaginationElement(pagesLimit, currentPageNumber == pagesLimit)
+    resultHTML += renderPaginationElement(pagesLimit, currentPageNumber === pagesLimit)
   } else if (currentPageNumber > pagesLimit - groupedPagesNumber) {
-    resultHTML += renderPaginationElement(1, currentPageNumber == 1)
+    resultHTML += renderPaginationElement(1, currentPageNumber === 1)
     resultHTML += renderPaginationElement('...', false)
     resultHTML += renderPaginationElements(pagesLimit - groupedPagesNumber, pagesLimit, currentPageNumber)
   } else {
-    resultHTML += renderPaginationElement(1, currentPageNumber == 1)
+    resultHTML += renderPaginationElement(1, currentPageNumber === 1)
     var step = parseInt(groupedPagesNumber / 2)
-    if (currentPageNumber - step - 1 == 2) {
-      resultHTML += renderPaginationElement(2, currentPageNumber == 2)
+    if (currentPageNumber - step - 1 === 2) {
+      resultHTML += renderPaginationElement(2, currentPageNumber === 2)
     } else if (currentPageNumber - step > 2) {
       resultHTML += renderPaginationElement('...', false)
     }
     resultHTML += renderPaginationElements(currentPageNumber - step, currentPageNumber + step, currentPageNumber)
-    if (currentPageNumber + step + 1 == pagesLimit - 1) {
-      resultHTML += renderPaginationElement(pagesLimit - 1, pagesLimit - 1 == currentPageNumber)
+    if (currentPageNumber + step + 1 === pagesLimit - 1) {
+      resultHTML += renderPaginationElement(pagesLimit - 1, pagesLimit - 1 === currentPageNumber)
     } else if (currentPageNumber + step < pagesLimit - 1) {
       resultHTML += renderPaginationElement('...', false)
     }
-    resultHTML += renderPaginationElement(pagesLimit, currentPageNumber == pagesLimit)
+    resultHTML += renderPaginationElement(pagesLimit, currentPageNumber === pagesLimit)
   }
   $container.html(resultHTML)
 }
@@ -321,11 +321,11 @@ function pagesNumbersGenerate (pagesLimit, $container, currentPageNumber) {
 function renderPaginationElements (start, end, currentPageNumber) {
   var resultHTML = ''
   for (var i = start; i <= end; i++) {
-    resultHTML += renderPaginationElement(i, i == currentPageNumber)
+    resultHTML += renderPaginationElement(i, i === currentPageNumber)
   }
   return resultHTML
 }
 
 function renderPaginationElement (text, active) {
-  return '<li class="page-item' + (active ? ' active' : '') + (text == '...' ? ' disabled' : '') + '"><a class="page-link" data-page-number=' + text + '>' + text + '</a></li>'
+  return '<li class="page-item' + (active ? ' active' : '') + (text === '...' ? ' disabled' : '') + '"><a class="page-link" data-page-number=' + text + '>' + text + '</a></li>'
 }
