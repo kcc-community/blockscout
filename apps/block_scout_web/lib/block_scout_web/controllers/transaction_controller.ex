@@ -49,7 +49,7 @@ defmodule BlockScoutWeb.TransactionController do
 
         pages_limit =
           if page_size != 0 do
-            ((Chain.limit_shownig_transactions() / page_size) |> Float.ceil() |> trunc()) - 1
+            (Chain.limit_shownig_transactions() |> Kernel./(page_size) |> Float.ceil() |> trunc()) - 1
           else
             -1
           end

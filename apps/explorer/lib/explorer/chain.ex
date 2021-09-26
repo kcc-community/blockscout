@@ -3194,7 +3194,8 @@ defmodule Explorer.Chain do
     paging_options = Keyword.get(options, :paging_options, @default_paging_options)
 
     if is_nil(paging_options.key) do
-      (paging_options.page_size + 1)
+      paging_options.page_size
+      |> Kernel.+(1)
       |> Transactions.take_enough()
       |> case do
         nil ->
@@ -3221,12 +3222,12 @@ defmodule Explorer.Chain do
     |> Repo.all()
   end
 
-  defp fetch_transactions_for_rap() do
+  defp fetch_transactions_for_rap do
     Transaction
     |> order_by([transaction], desc: transaction.block_number, desc: transaction.index)
   end
 
-  defp transactions_available_count() do
+  defp transactions_available_count do
     Transaction
     |> where([transaction], not is_nil(transaction.block_number) and not is_nil(transaction.index))
     |> limit(^@limit_showing_transaсtions)
