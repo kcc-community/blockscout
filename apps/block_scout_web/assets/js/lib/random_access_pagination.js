@@ -1,7 +1,6 @@
 import $ from 'jquery'
 import map from 'lodash/map'
 import merge from 'lodash/merge'
-import URI from 'urijs'
 import humps from 'humps'
 import listMorph from '../lib/list_morph'
 import reduceReducers from 'reduce-reducers'
@@ -63,8 +62,6 @@ export function asyncReducer (state = asyncInitialState, action) {
       })
     }
     case 'ITEMS_FETCHED': {
-      console.log(action)
-
       var pageNumber = parseInt( action.nextPageParams.pageNumber )
       delete action.nextPageParams.pageNumber
 
@@ -267,6 +264,15 @@ function firstPageLoad (store) {
 
   $element.on('click', '[data-page-number]', (event) => {
     loadPageByNumber(store, event.target.dataset.pageNumber)
+  })
+
+  $element.on('click', '[input-page-number]', (event) => {
+      event.preventDefault()
+      var $input = event.target.parentElement.querySelector('#page-number')
+      var input = parseInt($input.value)
+      if (!isNaN(input) && input <= store.getState().pagesLimit)
+        loadPageByNumber(store, input)
+      $input.value = ''
   })
 }
 

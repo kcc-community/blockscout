@@ -116,6 +116,28 @@ $pagination-page-link-color-active: #fff !default;
   }
 }
 
+.tb {
+  background-color: #00000000 !important;
+  border: none !important;
+}
+
+.ml10 {
+  margin-left: 10px;
+}
+
+.page-number {
+  background-color: $pagination-page-link-background;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 2px;
+  border-color: $pagination-page-link-color;
+  color: $pagination-page-link-color;
+}
+
+.page-number:focus {
+  border: 1px solid $pagination-page-link-color;
+}
+
 .fml5 {
   margin-left: 5px !important;
 }

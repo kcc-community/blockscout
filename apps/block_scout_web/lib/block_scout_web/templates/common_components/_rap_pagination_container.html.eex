@@ -29,5 +29,7 @@ data-pagination-container>
                 </svg>
             </a>
         </li>
+        <li class="page-link no-hover tb ml10" ><%= gettext("Go to")%></li>
+        <li class="page-item"><form><input class="page-item page-number" id="page-number" type=text size=1><input class="d-none" type=submit input-page-number></form></li>
     </ul>
 </div>
