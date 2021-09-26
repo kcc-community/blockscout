@@ -11,9 +11,9 @@ const maxPageNumberInOneLine = 7
 const groupedPagesNumber = 3
 
 /**
- * 
+ *
  * This module is a clone of async_listing_load.js adapted for pagination with random access
- * 
+ *
  */
 
 var enableFirstLoading = true
@@ -62,7 +62,7 @@ export function asyncReducer (state = asyncInitialState, action) {
       })
     }
     case 'ITEMS_FETCHED': {
-      var pageNumber = parseInt( action.nextPageParams.pageNumber )
+      var pageNumber = parseInt(action.nextPageParams.pageNumber)
       delete action.nextPageParams.pageNumber
 
       return Object.assign({}, state, {
@@ -70,7 +70,7 @@ export function asyncReducer (state = asyncInitialState, action) {
         emptyResponse: action.items.length === 0,
         items: action.items,
         nextPageParams: humps.decamelizeKeys(action.nextPageParams),
-        pagesLimit: parseInt( action.nextPageParams.pagesLimit ),
+        pagesLimit: parseInt(action.nextPageParams.pagesLimit),
         currentPageNumber: pageNumber,
         beyondPageOne: pageNumber != 1
       })
@@ -161,8 +161,7 @@ export const elements = {
   },
   '[data-async-listing] [pages-numbers-container]': {
     render ($el, state) {
-      if (typeof state.pagesLimit !== 'undefined')
-        pagesNumbersGenerate(state.pagesLimit, $el, state.currentPageNumber)
+      if (typeof state.pagesLimit !== 'undefined') { pagesNumbersGenerate(state.pagesLimit, $el, state.currentPageNumber) }
     }
   },
   '[data-async-listing] [data-loading-button]': {
@@ -224,13 +223,13 @@ export function refreshPage (store) {
   loadPageByNumber(store, store.getState().currentPageNumber)
 }
 
-export function loadPageByNumber(store, pageNumber) {
-    var path = $('[data-async-listing]').data('async-listing')
-    store.dispatch({ type: 'START_REQUEST', path })
-    $.getJSON(path, merge({ type: 'JSON', 'page_number': pageNumber}, store.getState().nextPageParams))
-      .done(response => store.dispatch(Object.assign({ type: 'ITEMS_FETCHED' }, humps.camelizeKeys(response))))
-      .fail(() => store.dispatch({ type: 'REQUEST_ERROR' }))
-      .always(() => store.dispatch({ type: 'FINISH_REQUEST' }))
+export function loadPageByNumber (store, pageNumber) {
+  var path = $('[data-async-listing]').data('async-listing')
+  store.dispatch({ type: 'START_REQUEST', path })
+  $.getJSON(path, merge({ type: 'JSON', page_number: pageNumber }, store.getState().nextPageParams))
+    .done(response => store.dispatch(Object.assign({ type: 'ITEMS_FETCHED' }, humps.camelizeKeys(response))))
+    .fail(() => store.dispatch({ type: 'REQUEST_ERROR' }))
+    .always(() => store.dispatch({ type: 'FINISH_REQUEST' }))
 }
 
 function firstPageLoad (store) {
@@ -267,12 +266,11 @@ function firstPageLoad (store) {
   })
 
   $element.on('click', '[input-page-number]', (event) => {
-      event.preventDefault()
-      var $input = event.target.parentElement.querySelector('#page-number')
-      var input = parseInt($input.value)
-      if (!isNaN(input) && input <= store.getState().pagesLimit)
-        loadPageByNumber(store, input)
-      $input.value = ''
+    event.preventDefault()
+    var $input = event.target.parentElement.querySelector('#page-number')
+    var input = parseInt($input.value)
+    if (!isNaN(input) && input <= store.getState().pagesLimit) { loadPageByNumber(store, input) }
+    $input.value = ''
   })
 }
 
@@ -288,48 +286,47 @@ if ($element.length) {
   }
 }
 
-function pagesNumbersGenerate(pagesLimit, $container, currentPageNumber){
-    var resultHTML = ''
-    if (pagesLimit < 1)
-        return
-    if (pagesLimit <= maxPageNumberInOneLine) {
-        resultHTML = renderPaginationElements(1, pagesLimit, currentPageNumber)
-    } else if (currentPageNumber < groupedPagesNumber) {
-        resultHTML += renderPaginationElements(1, groupedPagesNumber, currentPageNumber)
-        resultHTML += renderPaginationElement('...', false)
-        resultHTML += renderPaginationElement(pagesLimit, currentPageNumber == pagesLimit)
-    } else if (currentPageNumber > pagesLimit - groupedPagesNumber) {
-        resultHTML += renderPaginationElement(1, 1 == currentPageNumber)
-        resultHTML += renderPaginationElement('...', false)
-        resultHTML += renderPaginationElements(pagesLimit - groupedPagesNumber, pagesLimit, currentPageNumber)
-    } else {
-        resultHTML += renderPaginationElement(1, currentPageNumber == 1)
-        var step = parseInt(groupedPagesNumber / 2)
-        if (currentPageNumber - step - 1 == 2) {
-          resultHTML += renderPaginationElement(2, 2 == currentPageNumber)    
-        } else if (currentPageNumber - step > 2) {
-          resultHTML += renderPaginationElement('...', false)
-        }
-        resultHTML += renderPaginationElements(currentPageNumber - step, currentPageNumber + step, currentPageNumber)
-        if (currentPageNumber + step + 1 == pagesLimit - 1) {
-            resultHTML += renderPaginationElement(pagesLimit - 1, pagesLimit - 1 == currentPageNumber)    
-        } else if (currentPageNumber + step < pagesLimit - 1) {
-            resultHTML += renderPaginationElement('...', false)
-        }
-        resultHTML += renderPaginationElement(pagesLimit, currentPageNumber == pagesLimit)
+function pagesNumbersGenerate (pagesLimit, $container, currentPageNumber) {
+  var resultHTML = ''
+  if (pagesLimit < 1) { return }
+  if (pagesLimit <= maxPageNumberInOneLine) {
+    resultHTML = renderPaginationElements(1, pagesLimit, currentPageNumber)
+  } else if (currentPageNumber < groupedPagesNumber) {
+    resultHTML += renderPaginationElements(1, groupedPagesNumber, currentPageNumber)
+    resultHTML += renderPaginationElement('...', false)
+    resultHTML += renderPaginationElement(pagesLimit, currentPageNumber == pagesLimit)
+  } else if (currentPageNumber > pagesLimit - groupedPagesNumber) {
+    resultHTML += renderPaginationElement(1, currentPageNumber == 1)
+    resultHTML += renderPaginationElement('...', false)
+    resultHTML += renderPaginationElements(pagesLimit - groupedPagesNumber, pagesLimit, currentPageNumber)
+  } else {
+    resultHTML += renderPaginationElement(1, currentPageNumber == 1)
+    var step = parseInt(groupedPagesNumber / 2)
+    if (currentPageNumber - step - 1 == 2) {
+      resultHTML += renderPaginationElement(2, currentPageNumber == 2)
+    } else if (currentPageNumber - step > 2) {
+      resultHTML += renderPaginationElement('...', false)
     }
+    resultHTML += renderPaginationElements(currentPageNumber - step, currentPageNumber + step, currentPageNumber)
+    if (currentPageNumber + step + 1 == pagesLimit - 1) {
+      resultHTML += renderPaginationElement(pagesLimit - 1, pagesLimit - 1 == currentPageNumber)
+    } else if (currentPageNumber + step < pagesLimit - 1) {
+      resultHTML += renderPaginationElement('...', false)
+    }
+    resultHTML += renderPaginationElement(pagesLimit, currentPageNumber == pagesLimit)
+  }
 
-    $container.html(resultHTML)
+  $container.html(resultHTML)
 }
 
-function renderPaginationElements(start, end, currentPageNumber) {
-    var resultHTML = ''
-    for (var i = start; i <= end; i++) {
-        resultHTML += renderPaginationElement(i, i == currentPageNumber)
-    }
-    return resultHTML
+function renderPaginationElements (start, end, currentPageNumber) {
+  var resultHTML = ''
+  for (var i = start; i <= end; i++) {
+    resultHTML += renderPaginationElement(i, i == currentPageNumber)
+  }
+  return resultHTML
 }
 
-function renderPaginationElement(text, active) {
-    return '<li class="page-item' + (active ? ' active' : '') + (text == '...' ? ' disabled' : '') + '"><a class="page-link" data-page-number=' + text + '>' + text + '</a></li>'
+function renderPaginationElement (text, active) {
+  return '<li class="page-item' + (active ? ' active' : '') + (text == '...' ? ' disabled' : '') + '"><a class="page-link" data-page-number=' + text + '>' + text + '</a></li>'
 }
