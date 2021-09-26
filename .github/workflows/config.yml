@@ -570,6 +570,7 @@ jobs:
         run: |
           mix ecto.create --quiet
           mix ecto.migrate
+          mix phx.digest
           cd apps/block_scout_web
           mix compile
           mix test --no-start --exclude no_parity
