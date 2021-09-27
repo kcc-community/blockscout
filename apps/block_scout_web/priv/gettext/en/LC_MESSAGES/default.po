@@ -1035,7 +1035,7 @@ msgstr ""
 #: lib/block_scout_web/templates/transaction/_pending_tile.html.eex:20 lib/block_scout_web/templates/transaction/_tile.html.eex:37
 #: lib/block_scout_web/views/wei_helpers.ex:78
 msgid "Ether"
-msgstr ""
+msgstr "KCS"
 
 #, elixir-format
 #: lib/block_scout_web/templates/api_docs/_action_tile.html.eex:211
@@ -2099,7 +2099,7 @@ msgstr ""
 #, elixir-format
 #: lib/block_scout_web/templates/smart_contract/_functions.html.eex:43
 msgid "The fallback function is executed on a call to the contract if none of the other functions match the given function signature, or if no data was supplied at all and there is no receive Ether function. The fallback function always receives data, but in order to also receive Ether it must be marked payable."
-msgstr ""
+msgstr "The fallback function is executed on a call to the contract if none of the other functions match the given function signature, or if no data was supplied at all and there is no receive KCS function. The fallback function always receives data, but in order to also receive KCS it must be marked payable."
 
 #, elixir-format
 #: lib/block_scout_web/templates/stakes/_table.html.eex:23
@@ -2139,7 +2139,7 @@ msgstr ""
 #, elixir-format
 #: lib/block_scout_web/templates/smart_contract/_functions.html.eex:45
 msgid "The receive function is executed on a call to the contract with empty calldata. This is the function that is executed on plain Ether transfers (e.g. via .send() or .transfer()). If no such function exists, but a payable fallback function exists, the fallback function will be called on a plain Ether transfer. If neither a receive Ether nor a payable fallback function is present, the contract cannot receive Ether through regular transactions and throws an exception."
-msgstr ""
+msgstr "The receive function is executed on a call to the contract with empty calldata. This is the function that is executed on plain KCS transfers (e.g. via .send() or .transfer()). If no such function exists, but a payable fallback function exists, the fallback function will be called on a plain KCS transfer. If neither a receive KCS nor a payable fallback function is present, the contract cannot receive KCS through regular transactions and throws an exception."
 
 #, elixir-format
 #: lib/block_scout_web/templates/stakes/_stakes_modal_delegators_list.html.eex:105
