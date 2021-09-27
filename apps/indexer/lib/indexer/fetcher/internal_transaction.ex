@@ -20,7 +20,7 @@ defmodule Indexer.Fetcher.InternalTransaction do
 
   @behaviour BufferedTask
 
-  @max_batch_size 10
+  @max_batch_size 5
   @max_concurrency 4
   @defaults [
     flush_interval: :timer.seconds(3),
@@ -48,7 +48,7 @@ defmodule Indexer.Fetcher.InternalTransaction do
   so the total number of internal transactions that could be produced is unknown.
   """
   @spec async_fetch([Block.block_number()]) :: :ok
-  def async_fetch(block_numbers, timeout \\ 30000) when is_list(block_numbers) do
+  def async_fetch(block_numbers, timeout \\ 5000) when is_list(block_numbers) do
     BufferedTask.buffer(__MODULE__, block_numbers, timeout)
   end
 
