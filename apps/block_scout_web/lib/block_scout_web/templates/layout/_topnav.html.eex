@@ -130,6 +130,7 @@
             </div>
           </li>
         <% end %>
+        <!--
         <%= if apps_menu == true || staking_enabled_in_menu do %>
           <li class="nav-item dropdown">
             <a href="#" role="button" id="navbarAppsDropdown" class="nav-link topnav-nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
@@ -161,6 +162,8 @@
             </div>
           </li>
         <% end %>
+        -->
+        <!--
         <li class="nav-item dropdown">
           <a class="nav-link topnav-nav-link active-icon <%= if dropdown_nets() != [], do: "dropdown-toggle js-show-network-selector" %>" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <span class="nav-link-icon">
@@ -183,6 +186,7 @@
             <% end %> 
           </div>
         </li>
+        -->
       </ul>
       <!-- Dark mode changer -->
       <button class="dark-mode-changer" id="dark-mode-changer">
