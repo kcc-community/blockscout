@@ -18,6 +18,7 @@ defmodule Explorer.Chain.Cache.NetVersion do
           Logger.info(["netversion222:#{value}}"])
         end
         {:update, value}
+        Logger.info(["netversion333:#{value}}"])
 
       {:error, reason} ->
         Logger.debug([
