@@ -12,6 +12,9 @@ defmodule Explorer.Chain.Cache.NetVersion do
   defp handle_fallback(:version) do
     case EthereumJSONRPC.fetch_net_version(Application.get_env(:explorer, :json_rpc_named_arguments)) do
       {:ok, value} ->
+        if value == 1 do
+          value = 321
+        end
         {:update, value}
 
       {:error, reason} ->
