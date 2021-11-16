@@ -1,7 +1,17 @@
 ## Current
 
 ### Features
-- [#4777](https://github.com/blockscout/blockscout/pull/4777), [#4791](https://github.com/blockscout/blockscout/pull/4791), [#4799](https://github.com/blockscout/blockscout/pull/4799) - Added decoding revert reason
+
+### Fixes
+
+### Chore
+
+
+## 4.0.0-beta
+
+### Features
+- [#4807](https://github.com/blockscout/blockscout/pull/4807) - Added support for BeaconProxy pattern
+- [#4777](https://github.com/blockscout/blockscout/pull/4777), [#4791](https://github.com/blockscout/blockscout/pull/4791), [#4799](https://github.com/blockscout/blockscout/pull/4799), [#4847](https://github.com/blockscout/blockscout/pull/4847) - Added decoding revert reason
 - [#4776](https://github.com/blockscout/blockscout/pull/4776) - Added view for unsuccessfully fetched values from read functions
 - [#4761](https://github.com/blockscout/blockscout/pull/4761) - ERC-1155 support
 - [#4739](https://github.com/blockscout/blockscout/pull/4739) - Improve logs and inputs decoding
@@ -23,6 +33,9 @@
 - [#4579](https://github.com/blockscout/blockscout/pull/4579) - Write contract page: Resize inputs; Improve multiplier selector
 
 ### Fixes
+- [#4857](https://github.com/blockscout/blockscout/pull/4857) - Fix `tx/raw-trace` Internal Server Error
+- [#4854](https://github.com/blockscout/blockscout/pull/4854) - Fix infinite gas usage count loading
+- [#4853](https://github.com/blockscout/blockscout/pull/4853) - Allow custom optimizations runs for contract verifications via API
 - [#4840](https://github.com/blockscout/blockscout/pull/4840) - Replace Enum.dedup with Enum.uniq where actually uniq items are expected
 - [#4835](https://github.com/blockscout/blockscout/pull/4835) - Fix view for broken token icons
 - [#4830](https://github.com/blockscout/blockscout/pull/4830) - Speed up txs per day chart data collection
@@ -63,10 +76,15 @@
 - [#4582](https://github.com/blockscout/blockscout/pull/4582) - Fix NaN input on write contract page
 
 ### Chore
+- [#4876](https://github.com/blockscout/blockscout/pull/4876) - Add missing columns updates when INSERT ... ON CONFLICT DO UPDATE ... happens
+- [#4872](https://github.com/blockscout/blockscout/pull/4872) - Set explicit ascending order by hash in acquire transactions query of internal transactions import
+- [#4871](https://github.com/blockscout/blockscout/pull/4871) - Remove cumulative gas used update duplicate
+- [#4860](https://github.com/blockscout/blockscout/pull/4860) - Node 16 support
 - [#4828](https://github.com/blockscout/blockscout/pull/4828) - Logging for txs/day chart
 - [#4823](https://github.com/blockscout/blockscout/pull/4823) - Various error handlers with unresponsive JSON RPC endpoint
 - [#4821](https://github.com/blockscout/blockscout/pull/4821) - Block Details page: Remove crossing at the Burnt Fee line
 - [#4819](https://github.com/blockscout/blockscout/pull/4819) - Add config for GasUsage Cache
+- [#4781](https://github.com/blockscout/blockscout/pull/4781) - PGAnalyze index suggestions
 - [#4735](https://github.com/blockscout/blockscout/pull/4735) - Code clean up: Remove clauses for outdated ganache bugs
 - [#4726](https://github.com/blockscout/blockscout/pull/4726) - Update chart.js
 - [#4707](https://github.com/blockscout/blockscout/pull/4707) - Top navigation: Move Accounts tab to Tokens
