@@ -107,6 +107,7 @@
             </div>
           </li>
         <% end %>
+        <!--
         <%= if apps_menu == true do %>
           <li class="nav-item dropdown">
             <a href="#" role="button" id="navbarAppsDropdown" class="nav-link topnav-nav-link dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
