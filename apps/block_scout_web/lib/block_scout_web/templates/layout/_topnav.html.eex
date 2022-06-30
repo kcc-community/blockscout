@@ -142,8 +142,8 @@
             <%= subnetwork_title() %>
           </a>
         </li>
+        -->
       </ul>
-      -->
       <!-- Dark mode changer -->
       <button class="dark-mode-changer" id="dark-mode-changer">
         <svg xmlns="http://www.w3.org/2000/svg" width="15" height="16">
