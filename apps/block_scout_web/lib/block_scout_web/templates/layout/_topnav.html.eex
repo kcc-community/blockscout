@@ -1,4 +1,7 @@
 <% apps_menu = Application.get_env(:block_scout_web, :apps_menu) %>
+<% other_nets = dropdown_other_nets() %>
+<% test_nets = test_nets(dropdown_nets()) %>
+<% main_nets = dropdown_head_main_nets() %>
 <nav class="navbar navbar-dark navbar-expand-lg navbar-primary" data-selector="navbar" id="top-navbar">
   <div class="container-fluid navbar-container">
     <%= link to: webapp_url(@conn), class: "navbar-brand", "data-test": "header_logo" do %>
