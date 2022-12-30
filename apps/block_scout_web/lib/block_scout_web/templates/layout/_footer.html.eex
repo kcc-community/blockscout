@@ -42,6 +42,7 @@
           <li><a href="https://kccofficial.medium.com/" rel="noreferrer" class="footer-link" target="_blank">Announcement</a></li>
           <li><a href="https://docs.kcc.io/#/en-us/?id=risk-statement" rel="noreferrer" class="footer-link">Risk Statement</a></li>
           <li><a href="https://docs.kcc.io/#/en-us/?id=disclaimers" rel="noreferrer" class="footer-link">Disclaimer</a></li>
+          <%= render BlockScoutWeb.LayoutView, "_add_chain_to_mm.html" %>
         </ul>
       </div>
 
