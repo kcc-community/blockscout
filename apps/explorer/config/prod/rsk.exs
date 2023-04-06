@@ -1,5 +1,12 @@
 import Config
 
+~w(config config_helper.exs)
+|> Path.join()
+|> Code.eval_file()
+
+hackney_opts = ConfigHelper.hackney_options()
+timeout = ConfigHelper.timeout(1)
+
 config :explorer,
   json_rpc_named_arguments: [
     transport: EthereumJSONRPC.HTTP,
@@ -11,7 +18,7 @@ config :explorer,
         eth_getBalance: System.get_env("ETHEREUM_JSONRPC_TRACE_URL"),
         trace_replayTransaction: System.get_env("ETHEREUM_JSONRPC_TRACE_URL")
       ],
-      http_options: [recv_timeout: :timer.minutes(1), timeout: :timer.minutes(1), hackney: [pool: :ethereum_jsonrpc]]
+      http_options: [recv_timeout: timeout, timeout: timeout, hackney: hackney_opts]
     ],
     variant: EthereumJSONRPC.RSK
   ],

@@ -66,7 +66,7 @@ defmodule Explorer.ChainSpec.GenesisData do
         case fetch_spec(path) do
           {:ok, chain_spec} ->
             case variant do
-              EthereumJSONRPC.Parity ->
+              EthereumJSONRPC.Nethermind ->
                 Importer.import_emission_rewards(chain_spec)
                 {:ok, _} = Importer.import_genesis_accounts(chain_spec)
 
@@ -79,6 +79,7 @@ defmodule Explorer.ChainSpec.GenesisData do
             end
 
           {:error, reason} ->
+            # credo:disable-for-next-line
             Logger.warn(fn -> "Failed to fetch genesis data. #{inspect(reason)}" end)
         end
       end)

@@ -3,6 +3,8 @@ defmodule Explorer.SmartContract.Vyper.Publisher do
   Module responsible to control Vyper contract verification.
   """
 
+  import Explorer.SmartContract.Helper, only: [cast_libraries: 1]
+
   alias Explorer.Chain
   alias Explorer.Chain.SmartContract
   alias Explorer.SmartContract.CompilerVersion
@@ -10,11 +12,88 @@ defmodule Explorer.SmartContract.Vyper.Publisher do
 
   def publish(address_hash, params) do
     case Verifier.evaluate_authenticity(address_hash, params) do
+      {
+        :ok,
+        %{
+          "abi" => abi_string,
+          "compilerVersion" => compiler_version,
+          "constructorArguments" => constructor_arguments,
+          "contractName" => contract_name,
+          "fileName" => file_name,
+          "sourceFiles" => sources,
+          "compilerSettings" => compiler_settings_string
+        }
+      } ->
+        %{^file_name => contract_source_code} = sources
+
+        compiler_settings = Jason.decode!(compiler_settings_string)
+
+        prepared_params =
+          %{}
+          |> Map.put("compiler_version", compiler_version)
+          |> Map.put("constructor_arguments", constructor_arguments)
+          |> Map.put("contract_source_code", contract_source_code)
+          |> Map.put("evm_version", compiler_settings["evmVersion"] || "istanbul")
+          |> Map.put("external_libraries", cast_libraries(compiler_settings["libraries"] || %{}))
+          |> Map.put("name", contract_name)
+
+        publish_smart_contract(address_hash, prepared_params, Jason.decode!(abi_string))
+
       {:ok, %{abi: abi}} ->
         publish_smart_contract(address_hash, params, abi)
 
       {:error, error} ->
         {:error, unverified_smart_contract(address_hash, params, error, nil)}
+
+      _ ->
+        {:error, unverified_smart_contract(address_hash, params, "Unexpected error", nil)}
+    end
+  end
+
+  def publish(address_hash, params, files) do
+    case Verifier.evaluate_authenticity(address_hash, params, files) do
+      {
+        :ok,
+        %{
+          "abi" => abi_string,
+          "compilerVersion" => compiler_version,
+          "constructorArguments" => constructor_arguments,
+          "contractName" => contract_name,
+          "fileName" => file_name,
+          "sourceFiles" => sources,
+          "compilerSettings" => compiler_settings_string
+        }
+      } ->
+        secondary_sources =
+          for {file, source} <- sources,
+              file != file_name,
+              do: %{"file_name" => file, "contract_source_code" => source, "address_hash" => address_hash}
+
+        %{^file_name => contract_source_code} = sources
+
+        compiler_settings = Jason.decode!(compiler_settings_string)
+
+        prepared_params =
+          %{}
+          |> Map.put("compiler_version", compiler_version)
+          |> Map.put("constructor_arguments", constructor_arguments)
+          |> Map.put("contract_source_code", contract_source_code)
+          |> Map.put("external_libraries", cast_libraries(compiler_settings["libraries"] || %{}))
+          |> Map.put("name", contract_name)
+          |> Map.put("file_path", file_name)
+          |> Map.put("secondary_sources", secondary_sources)
+          |> Map.put("evm_version", compiler_settings["evmVersion"] || "default")
+
+        publish_smart_contract(address_hash, prepared_params, Jason.decode!(abi_string))
+
+      {:ok, %{abi: abi}} ->
+        publish_smart_contract(address_hash, params, abi)
+
+      {:error, error} ->
+        {:error, unverified_smart_contract(address_hash, params, error, nil)}
+
+      _ ->
+        {:error, unverified_smart_contract(address_hash, params, "Unexpected error", nil)}
     end
   end
 
@@ -54,7 +133,7 @@ defmodule Explorer.SmartContract.Vyper.Publisher do
       address_hash: address_hash,
       name: "Vyper_contract",
       compiler_version: compiler_version,
-      evm_version: nil,
+      evm_version: params["evm_version"],
       optimization_runs: nil,
       optimization: false,
       contract_source_code: params["contract_source_code"],
@@ -64,7 +143,8 @@ defmodule Explorer.SmartContract.Vyper.Publisher do
       abi: abi,
       verified_via_sourcify: false,
       partially_verified: false,
-      is_vyper_contract: true
+      is_vyper_contract: true,
+      file_path: params["file_path"]
     }
   end
 end

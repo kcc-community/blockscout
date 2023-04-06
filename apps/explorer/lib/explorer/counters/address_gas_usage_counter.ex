@@ -11,7 +11,7 @@ defmodule Explorer.Counters.AddressTransactionsGasUsageCounter do
   @cache_name :address_transactions_gas_usage_counter
   @last_update_key "last_update"
 
-  config = Application.get_env(:explorer, __MODULE__)
+  config = Application.compile_env(:explorer, __MODULE__)
   @enable_consolidation Keyword.get(config, :enable_consolidation)
 
   @spec start_link(term()) :: GenServer.on_start()
@@ -53,7 +53,7 @@ defmodule Explorer.Counters.AddressTransactionsGasUsageCounter do
   def cache_name, do: @cache_name
 
   defp cache_expired?(address) do
-    cache_period = address_transactions_gas_usage_counter_cache_period()
+    cache_period = Application.get_env(:explorer, __MODULE__)[:cache_period]
     address_hash_string = to_string(address.hash)
     updated_at = fetch_from_cache("hash_#{address_hash_string}_#{@last_update_key}")
 
@@ -93,8 +93,4 @@ defmodule Explorer.Counters.AddressTransactionsGasUsageCounter do
   end
 
   defp enable_consolidation?, do: @enable_consolidation
-
-  defp address_transactions_gas_usage_counter_cache_period do
-    Helper.cache_period("CACHE_ADDRESS_TRANSACTIONS_GAS_USAGE_COUNTER_PERIOD", 1)
-  end
 end

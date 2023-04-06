@@ -59,10 +59,15 @@ defmodule Explorer.Token.InstanceMetadataRetriever do
 
   @no_uri_error "no uri"
   @vm_execution_error "VM execution error"
+  @ipfs_protocol "ipfs://"
+  @ipfs_link "https://ipfs.io/ipfs/"
+
+  # https://eips.ethereum.org/EIPS/eip-1155#metadata
+  @erc1155_token_id_placeholder "{id}"
 
   def fetch_metadata(unquote(@cryptokitties_address_hash), token_id) do
-    %{"tokenURI" => {:ok, ["https://api.cryptokitties.co/kitties/#{token_id}"]}}
-    |> fetch_json()
+    %{@token_uri => {:ok, ["https://api.cryptokitties.co/kitties/{id}"]}}
+    |> fetch_json(to_string(token_id))
   end
 
   def fetch_metadata(contract_address_hash, token_id) do
@@ -75,11 +80,13 @@ defmodule Explorer.Token.InstanceMetadataRetriever do
       |> fetch_json()
 
     if res == {:ok, %{error: @vm_execution_error}} do
+      hex_normalized_token_id = token_id |> Integer.to_string(16) |> String.downcase() |> String.pad_leading(64, "0")
+
       contract_functions_uri = %{@uri => [token_id]}
 
       contract_address_hash
       |> query_contract(contract_functions_uri, @abi_uri)
-      |> fetch_json()
+      |> fetch_json(hex_normalized_token_id)
     else
       res
     end
@@ -89,137 +96,155 @@ defmodule Explorer.Token.InstanceMetadataRetriever do
     Reader.query_contract(contract_address_hash, abi, contract_functions, false)
   end
 
-  def fetch_json(uri) when uri in [%{@token_uri => {:ok, [""]}}, %{@uri => {:ok, [""]}}] do
+  def fetch_json(uri, hex_token_id \\ nil)
+
+  def fetch_json(uri, _hex_token_id) when uri in [%{@token_uri => {:ok, [""]}}, %{@uri => {:ok, [""]}}] do
     {:ok, %{error: @no_uri_error}}
   end
 
-  def fetch_json(uri)
-      when uri in [
-             %{@token_uri => {:error, "(-32015) VM execution error."}},
-             %{@uri => {:error, "(-32015) VM execution error."}}
-           ] do
-    {:ok, %{error: @vm_execution_error}}
+  def fetch_json(%{@token_uri => uri}, hex_token_id) do
+    fetch_json_from_uri(uri, hex_token_id)
   end
 
-  def fetch_json(%{@token_uri => {:error, "(-32015) VM execution error." <> _}}) do
-    {:ok, %{error: @vm_execution_error}}
+  def fetch_json(%{@uri => uri}, hex_token_id) do
+    fetch_json_from_uri(uri, hex_token_id)
   end
 
-  def fetch_json(%{@uri => {:error, "(-32015) VM execution error." <> _}}) do
-    {:ok, %{error: @vm_execution_error}}
+  # CIDv0 IPFS links # https://docs.ipfs.tech/concepts/content-addressing/#version-0-v0
+  def fetch_json("Qm" <> _ = result, hex_token_id) do
+    if String.length(result) == 46 do
+      fetch_json_from_uri({:ok, [@ipfs_link <> result]}, hex_token_id)
+    else
+      Logger.debug(["Unknown metadata format result #{inspect(result)}."], fetcher: :token_instances)
+
+      {:error, result}
+    end
   end
 
-  def fetch_json(%{@token_uri => {:ok, ["http://" <> _ = token_uri]}}) do
-    fetch_metadata(token_uri)
+  def fetch_json(result, hex_token_id) do
+    case URI.parse(result) do
+      %URI{host: nil} ->
+        Logger.debug(["Unknown metadata format #{inspect(result)}."], fetcher: :token_instances)
+
+        {:error, result}
+
+      _ ->
+        fetch_json_from_uri({:ok, [result]}, hex_token_id)
+    end
   end
 
-  def fetch_json(%{@uri => {:ok, ["http://" <> _ = token_uri]}}) do
-    fetch_metadata(token_uri)
+  defp fetch_json_from_uri({:error, error}, _hex_token_id) do
+    if error =~ "execution reverted" or error =~ @vm_execution_error do
+      {:ok, %{error: @vm_execution_error}}
+    else
+      Logger.debug(["Unknown metadata format error #{inspect(error)}."], fetcher: :token_instances)
+
+      {:error, error}
+    end
   end
 
-  def fetch_json(%{@token_uri => {:ok, ["https://" <> _ = token_uri]}}) do
-    fetch_metadata(token_uri)
+  defp fetch_json_from_uri({:ok, ["'" <> token_uri]}, hex_token_id) do
+    token_uri = token_uri |> String.split("'") |> List.first()
+    fetch_metadata_inner(token_uri, hex_token_id)
   end
 
-  def fetch_json(%{@uri => {:ok, ["https://" <> _ = token_uri]}}) do
-    fetch_metadata(token_uri)
+  defp fetch_json_from_uri({:ok, ["http://" <> _ = token_uri]}, hex_token_id) do
+    fetch_metadata_inner(token_uri, hex_token_id)
   end
 
-  def fetch_json(%{@token_uri => {:ok, ["data:application/json," <> json]}}) do
+  defp fetch_json_from_uri({:ok, ["https://" <> _ = token_uri]}, hex_token_id) do
+    fetch_metadata_inner(token_uri, hex_token_id)
+  end
+
+  defp fetch_json_from_uri({:ok, ["data:application/json," <> json]}, hex_token_id) do
     decoded_json = URI.decode(json)
 
-    fetch_json(%{@token_uri => {:ok, [decoded_json]}})
+    fetch_json_from_uri({:ok, [decoded_json]}, hex_token_id)
   rescue
     e ->
-      Logger.debug(["Unknown metadata format #{inspect(json)}. error #{inspect(e)}"],
+      Logger.debug(["Unknown metadata format #{inspect(json)}.", Exception.format(:error, e, __STACKTRACE__)],
         fetcher: :token_instances
       )
 
       {:error, json}
   end
 
-  def fetch_json(%{@uri => {:ok, ["data:application/json," <> json]}}) do
-    decoded_json = URI.decode(json)
+  defp fetch_json_from_uri({:ok, ["data:application/json;base64," <> base64_encoded_json]}, hex_token_id) do
+    case Base.decode64(base64_encoded_json) do
+      {:ok, base64_decoded} ->
+        fetch_json_from_uri({:ok, [base64_decoded]}, hex_token_id)
 
-    fetch_json(%{@token_uri => {:ok, [decoded_json]}})
+      _ ->
+        {:error, base64_encoded_json}
+    end
   rescue
     e ->
-      Logger.debug(["Unknown metadata format #{inspect(json)}. error #{inspect(e)}"],
+      Logger.debug(
+        [
+          "Unknown metadata format base64 #{inspect(base64_encoded_json)}.",
+          Exception.format(:error, e, __STACKTRACE__)
+        ],
         fetcher: :token_instances
       )
 
-      {:error, json}
+      {:error, base64_encoded_json}
   end
 
-  def fetch_json(%{@token_uri => {:ok, ["ipfs://ipfs/" <> ipfs_uid]}}) do
-    ipfs_url = "https://ipfs.io/ipfs/" <> ipfs_uid
-    fetch_metadata(ipfs_url)
+  defp fetch_json_from_uri({:ok, ["#{@ipfs_protocol}ipfs/" <> right]}, hex_token_id) do
+    fetch_from_ipfs(right, hex_token_id)
   end
 
-  def fetch_json(%{@uri => {:ok, ["ipfs://ipfs/" <> ipfs_uid]}}) do
-    ipfs_url = "https://ipfs.io/ipfs/" <> ipfs_uid
-    fetch_metadata(ipfs_url)
+  defp fetch_json_from_uri({:ok, [@ipfs_protocol <> right]}, hex_token_id) do
+    fetch_from_ipfs(right, hex_token_id)
   end
 
-  def fetch_json(%{@token_uri => {:ok, ["ipfs://" <> ipfs_uid]}}) do
-    ipfs_url = "https://ipfs.io/ipfs/" <> ipfs_uid
-    fetch_metadata(ipfs_url)
-  end
-
-  def fetch_json(%{@uri => {:ok, ["ipfs://" <> ipfs_uid]}}) do
-    ipfs_url = "https://ipfs.io/ipfs/" <> ipfs_uid
-    fetch_metadata(ipfs_url)
-  end
-
-  def fetch_json(%{@token_uri => {:ok, [json]}}) do
+  defp fetch_json_from_uri({:ok, [json]}, hex_token_id) do
     {:ok, json} = decode_json(json)
 
-    check_type(json)
+    check_type(json, hex_token_id)
   rescue
     e ->
-      Logger.debug(["Unknown metadata format #{inspect(json)}. error #{inspect(e)}"],
+      Logger.debug(["Unknown metadata format #{inspect(json)}.", Exception.format(:error, e, __STACKTRACE__)],
         fetcher: :token_instances
       )
 
       {:error, json}
   end
 
-  def fetch_json(%{@uri => {:ok, [json]}}) do
-    {:ok, json} = decode_json(json)
+  defp fetch_json_from_uri(uri, _hex_token_id) do
+    Logger.debug(["Unknown metadata uri format #{inspect(uri)}."], fetcher: :token_instances)
 
-    check_type(json)
+    {:error, uri}
+  end
+
+  defp fetch_from_ipfs(ipfs_uid, hex_token_id) do
+    ipfs_url = @ipfs_link <> ipfs_uid
+    fetch_metadata_inner(ipfs_url, hex_token_id)
+  end
+
+  defp fetch_metadata_inner(uri, hex_token_id) do
+    prepared_uri = substitute_token_id_to_token_uri(uri, hex_token_id)
+    fetch_metadata_from_uri(prepared_uri, hex_token_id)
   rescue
     e ->
-      Logger.debug(["Unknown metadata format #{inspect(json)}. error #{inspect(e)}"],
+      Logger.debug(
+        ["Could not prepare token uri #{inspect(uri)}.", Exception.format(:error, e, __STACKTRACE__)],
         fetcher: :token_instances
       )
 
-      {:error, json}
+      {:error, :request_error}
   end
 
-  def fetch_json(result) do
-    Logger.debug(["Unknown metadata format #{inspect(result)}."], fetcher: :token_instances)
-
-    {:error, result}
-  end
-
-  defp fetch_metadata(uri) do
-    case HTTPoison.get(uri) do
+  def fetch_metadata_from_uri(uri, hex_token_id \\ nil) do
+    case Application.get_env(:explorer, :http_adapter).get(uri, [],
+           timeout: 60_000,
+           recv_timeout: 60_000,
+           follow_redirect: true
+         ) do
       {:ok, %Response{body: body, status_code: 200, headers: headers}} ->
-        if Enum.member?(headers, {"Content-Type", "image/png"}) do
-          json = %{"image" => uri}
+        content_type = get_content_type_from_headers(headers)
 
-          check_type(json)
-        else
-          {:ok, json} = decode_json(body)
-
-          check_type(json)
-        end
-
-      {:ok, %Response{body: body, status_code: 301}} ->
-        {:ok, json} = decode_json(body)
-
-        check_type(json)
+        check_content_type(content_type, uri, hex_token_id, body)
 
       {:ok, %Response{body: body}} ->
         {:error, body}
@@ -229,11 +254,44 @@ defmodule Explorer.Token.InstanceMetadataRetriever do
     end
   rescue
     e ->
-      Logger.debug(["Could not send request to token uri #{inspect(uri)}. error #{inspect(e)}"],
+      Logger.debug(
+        ["Could not send request to token uri #{inspect(uri)}.", Exception.format(:error, e, __STACKTRACE__)],
         fetcher: :token_instances
       )
 
       {:error, :request_error}
+  end
+
+  defp check_content_type(content_type, uri, hex_token_id, body) do
+    image = is_image?(content_type)
+    video = is_video?(content_type)
+
+    if content_type && (image || video) do
+      json = if image, do: %{"image" => uri}, else: %{"animation_url" => uri}
+
+      check_type(json, nil)
+    else
+      {:ok, json} = decode_json(body)
+
+      check_type(json, hex_token_id)
+    end
+  end
+
+  defp get_content_type_from_headers(headers) do
+    {_, content_type} =
+      Enum.find(headers, fn {header_name, _header_value} ->
+        header_name == "Content-Type"
+      end) || {nil, nil}
+
+    content_type
+  end
+
+  defp is_image?(content_type) do
+    content_type && String.starts_with?(content_type, "image/")
+  end
+
+  defp is_video?(content_type) do
+    content_type && String.starts_with?(content_type, "video/")
   end
 
   defp decode_json(body) do
@@ -246,11 +304,33 @@ defmodule Explorer.Token.InstanceMetadataRetriever do
     end
   end
 
-  defp check_type(json) when is_map(json) do
+  defp check_type(json, nil) when is_map(json) do
     {:ok, %{metadata: json}}
   end
 
-  defp check_type(_) do
+  defp check_type(json, hex_token_id) when is_map(json) do
+    metadata =
+      case json
+           |> Jason.encode!()
+           |> String.replace(@erc1155_token_id_placeholder, hex_token_id)
+           |> Jason.decode() do
+        {:ok, map} ->
+          map
+
+        _ ->
+          json
+      end
+
+    {:ok, %{metadata: metadata}}
+  end
+
+  defp check_type(_, _) do
     {:error, :wrong_metadata_type}
+  end
+
+  defp substitute_token_id_to_token_uri(token_uri, empty_token_id) when empty_token_id in [nil, ""], do: token_uri
+
+  defp substitute_token_id_to_token_uri(token_uri, hex_token_id) do
+    String.replace(token_uri, @erc1155_token_id_placeholder, hex_token_id)
   end
 end

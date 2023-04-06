@@ -24,10 +24,10 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
     start_supervised!({CoinBalanceOnDemand, [mocked_json_rpc_named_arguments, [name: CoinBalanceOnDemand]]})
     start_supervised!(AddressesCounter)
 
-    Application.put_env(:explorer, AverageBlockTime, enabled: true)
+    Application.put_env(:explorer, AverageBlockTime, enabled: true, cache_period: 1_800_000)
 
     on_exit(fn ->
-      Application.put_env(:explorer, AverageBlockTime, enabled: false)
+      Application.put_env(:explorer, AverageBlockTime, enabled: false, cache_period: 1_800_000)
     end)
 
     :ok
@@ -102,8 +102,8 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       first_address_hash = to_string(first_address.hash)
       second_address_hash = to_string(second_address.hash)
 
-      first_address_inserted_at = to_string(first_address.inserted_at)
-      second_address_inserted_at = to_string(second_address.inserted_at)
+      _first_address_inserted_at = to_string(first_address.inserted_at)
+      _second_address_inserted_at = to_string(second_address.inserted_at)
 
       response =
         conn
@@ -1090,7 +1090,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with startblock and endblock params", %{conn: conn} do
+    test "with start_block and end_block params", %{conn: conn} do
       blocks = [_, second_block, third_block, _] = insert_list(4, :block)
       address = insert(:address)
 
@@ -1104,8 +1104,8 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "startblock" => "#{second_block.number}",
-        "endblock" => "#{third_block.number}"
+        "start_block" => "#{second_block.number}",
+        "end_block" => "#{third_block.number}"
       }
 
       expected_block_numbers = [
@@ -1129,7 +1129,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with startblock but without endblock", %{conn: conn} do
+    test "with start_block but without end_block", %{conn: conn} do
       blocks = [_, _, third_block, fourth_block] = insert_list(4, :block)
       address = insert(:address)
 
@@ -1143,7 +1143,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "startblock" => "#{third_block.number}"
+        "start_block" => "#{third_block.number}"
       }
 
       expected_block_numbers = [
@@ -1167,7 +1167,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with endblock but without startblock", %{conn: conn} do
+    test "with end_block but without start_block", %{conn: conn} do
       blocks = [first_block, second_block, _, _] = insert_list(4, :block)
       address = insert(:address)
 
@@ -1181,7 +1181,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "endblock" => "#{second_block.number}"
+        "end_block" => "#{second_block.number}"
       }
 
       expected_block_numbers = [
@@ -1205,7 +1205,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "ignores invalid startblock and endblock", %{conn: conn} do
+    test "ignores invalid start_block and end_block", %{conn: conn} do
       blocks = [_, _, _, _] = insert_list(4, :block)
       address = insert(:address)
 
@@ -1219,8 +1219,8 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "startblock" => "invalidstart",
-        "endblock" => "invalidend"
+        "start_block" => "invalidstart",
+        "end_block" => "invalidend"
       }
 
       assert response =
@@ -1234,7 +1234,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with starttimestamp and endtimestamp params", %{conn: conn} do
+    test "with start_timestamp and end_timestamp params", %{conn: conn} do
       now = Timex.now()
       timestamp1 = Timex.shift(now, hours: -6)
       timestamp2 = Timex.shift(now, hours: -3)
@@ -1257,8 +1257,8 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "starttimestamp" => "#{start_timestamp}",
-        "endtimestamp" => "#{end_timestamp}"
+        "start_timestamp" => "#{start_timestamp}",
+        "end_timestamp" => "#{end_timestamp}"
       }
 
       expected_block_numbers = [
@@ -1282,7 +1282,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with starttimestamp but without endtimestamp", %{conn: conn} do
+    test "with start_timestamp but without end_timestamp", %{conn: conn} do
       now = Timex.now()
       timestamp1 = Timex.shift(now, hours: -6)
       timestamp2 = Timex.shift(now, hours: -3)
@@ -1304,7 +1304,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "starttimestamp" => "#{start_timestamp}"
+        "start_timestamp" => "#{start_timestamp}"
       }
 
       expected_block_numbers = [
@@ -1330,7 +1330,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with endtimestamp but without starttimestamp", %{conn: conn} do
+    test "with end_timestamp but without start_timestamp", %{conn: conn} do
       now = Timex.now()
       timestamp1 = Timex.shift(now, hours: -6)
       timestamp2 = Timex.shift(now, hours: -3)
@@ -1352,7 +1352,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "endtimestamp" => "#{end_timestamp}"
+        "end_timestamp" => "#{end_timestamp}"
       }
 
       expected_block_numbers = [
@@ -1376,7 +1376,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with filterby=to option", %{conn: conn} do
+    test "with filter_by=to option", %{conn: conn} do
       block = insert(:block)
       address = insert(:address)
 
@@ -1390,7 +1390,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "filterby" => "to"
+        "filter_by" => "to"
       }
 
       assert response =
@@ -1404,7 +1404,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert :ok = ExJsonSchema.Validator.validate(txlist_schema(), response)
     end
 
-    test "with filterby=from option", %{conn: conn} do
+    test "with filter_by=from option", %{conn: conn} do
       block = insert(:block)
       address = insert(:address)
 
@@ -1421,7 +1421,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
         "module" => "account",
         "action" => "txlist",
         "address" => "#{address.hash}",
-        "filterby" => "from"
+        "filter_by" => "from"
       }
 
       assert response =
@@ -2221,7 +2221,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       token_transfer =
         insert(:token_transfer, %{
           token_contract_address: token_address,
-          token_id: 666,
+          token_ids: [666],
           transaction: transaction,
           block: transaction.block,
           block_number: transaction.block_number
@@ -2241,7 +2241,7 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
                |> get("/api", params)
                |> json_response(200)
 
-      assert result["tokenID"] == to_string(token_transfer.token_id)
+      assert result["tokenID"] == to_string(List.first(token_transfer.token_ids))
       assert response["status"] == "1"
       assert response["message"] == "OK"
       assert :ok = ExJsonSchema.Validator.validate(tokentx_schema(), response)
@@ -2830,16 +2830,16 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
   describe "optional_params/1" do
     test "includes valid optional params in the required format" do
       params = %{
-        "startblock" => "100",
-        "endblock" => "120",
+        "start_block" => "100",
+        "end_block" => "120",
         "sort" => "asc",
         # page number
         "page" => "1",
         # page size
         "offset" => "2",
-        "filterby" => "to",
-        "starttimestamp" => "1539186474",
-        "endtimestamp" => "1539186474"
+        "filter_by" => "to",
+        "start_timestamp" => "1539186474",
+        "end_timestamp" => "1539186474"
       }
 
       optional_params = AddressController.optional_params(params)
@@ -2875,20 +2875,20 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
       assert AddressController.optional_params(params3) == %{}
     end
 
-    test "'filterby' value can be 'to' or 'from'" do
-      params1 = %{"filterby" => "to"}
+    test "'filter_by' value can be 'to' or 'from'" do
+      params1 = %{"filter_by" => "to"}
 
       optional_params1 = AddressController.optional_params(params1)
 
       assert optional_params1.filter_by == "to"
 
-      params2 = %{"filterby" => "from"}
+      params2 = %{"filter_by" => "from"}
 
       optional_params2 = AddressController.optional_params(params2)
 
       assert optional_params2.filter_by == "from"
 
-      params3 = %{"filterby" => "invalid"}
+      params3 = %{"filter_by" => "invalid"}
 
       assert AddressController.optional_params(params3) == %{}
     end
@@ -2899,25 +2899,25 @@ defmodule BlockScoutWeb.API.RPC.AddressControllerTest do
 
     test "ignores invalid optional params, keeps valid ones" do
       params1 = %{
-        "startblock" => "invalid",
-        "endblock" => "invalid",
+        "start_block" => "invalid",
+        "end_block" => "invalid",
         "sort" => "invalid",
         "page" => "invalid",
         "offset" => "invalid",
-        "starttimestamp" => "invalid",
-        "endtimestamp" => "invalid"
+        "start_timestamp" => "invalid",
+        "end_timestamp" => "invalid"
       }
 
       assert AddressController.optional_params(params1) == %{}
 
       params2 = %{
-        "startblock" => "4",
-        "endblock" => "10",
+        "start_block" => "4",
+        "end_block" => "10",
         "sort" => "invalid",
         "page" => "invalid",
         "offset" => "invalid",
-        "starttimestamp" => "invalid",
-        "endtimestamp" => "invalid"
+        "start_timestamp" => "invalid",
+        "end_timestamp" => "invalid"
       }
 
       optional_params = AddressController.optional_params(params2)

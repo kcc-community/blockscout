@@ -9,6 +9,7 @@ defmodule Explorer.Chain.Import.Runner.Tokens do
 
   alias Ecto.{Multi, Repo}
   alias Explorer.Chain.{Hash, Import, Token}
+  alias Explorer.Prometheus.Instrumenter
 
   @behaviour Import.Runner
 
@@ -63,7 +64,7 @@ defmodule Explorer.Chain.Import.Runner.Tokens do
           order_by: [
             token.contract_address_hash
           ],
-          lock: "FOR UPDATE"
+          lock: "FOR NO KEY UPDATE"
         )
       end
 
@@ -78,7 +79,7 @@ defmodule Explorer.Chain.Import.Runner.Tokens do
             token.contract_address_hash,
             instance.token_id
           ],
-          lock: "FOR UPDATE"
+          lock: "FOR NO KEY UPDATE OF t0"
         )
       end
 
@@ -155,7 +156,12 @@ defmodule Explorer.Chain.Import.Runner.Tokens do
       |> Map.put(:timestamps, timestamps)
 
     Multi.run(multi, :tokens, fn repo, _ ->
-      insert(repo, changes_list, insert_options)
+      Instrumenter.block_import_stage_runner(
+        fn -> insert(repo, changes_list, insert_options) end,
+        :block_referencing,
+        :tokens,
+        :tokens
+      )
     end)
   end
 

@@ -1,8 +1,8 @@
-FROM bitwalker/alpine-elixir-phoenix:1.13 AS builder
+FROM bitwalker/alpine-elixir-phoenix:1.14 AS builder
 
 WORKDIR /app
 
-RUN apk --no-cache --update add alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3 file qemu-x86_64 jq
+RUN apk --no-cache --update add alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3 file qemu-x86_64
 
 ENV GLIBC_REPO=https://github.com/sgerrand/alpine-pkg-glibc \
     GLIBC_VERSION=2.30-r0 \
@@ -25,16 +25,17 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 ARG CACHE_EXCHANGE_RATES_PERIOD
 ARG DISABLE_READ_API
-ARG API_PATH
-ARG NETWORK_PATH
 ARG DISABLE_WEBAPP
 ARG DISABLE_WRITE_API
 ARG CACHE_ENABLE_TOTAL_GAS_USAGE_COUNTER
 ARG WOBSERVER_ENABLED
 ARG ADMIN_PANEL_ENABLED
 ARG CACHE_ADDRESS_WITH_BALANCES_UPDATE_INTERVAL
-ARG SOCKET_ROOT
-ARG COIN
+ARG SESSION_COOKIE_DOMAIN
+ARG MIXPANEL_TOKEN
+ARG MIXPANEL_URL
+ARG AMPLITUDE_API_KEY
+ARG AMPLITUDE_URL
 
 # Cache elixir deps
 ADD mix.exs mix.lock ./
@@ -48,14 +49,6 @@ RUN mix do deps.get, local.rebar --force, deps.compile
 ADD . .
 
 COPY . .
-
-RUN if [ "$COIN" != "" ]; then \
-        sed -i s/"POA"/"${COIN}"/g apps/block_scout_web/priv/gettext/en/LC_MESSAGES/default.po; \
-        sed -i "/msgid \"Ether\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/default.pot; \
-        sed -i "/msgid \"Ether\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/en/LC_MESSAGES/default.po; \
-        sed -i "/msgid \"ETH\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/default.pot; \
-        sed -i "/msgid \"ETH\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/en/LC_MESSAGES/default.po; \
-    fi
 
 # Run forderground build and phoenix digest
 RUN mix compile && npm install npm@latest
@@ -76,9 +69,19 @@ RUN mkdir -p /opt/release \
   && mv _build/${MIX_ENV}/rel/blockscout /opt/release
 
 ##############################################################
-FROM bitwalker/alpine-elixir-phoenix:1.13
+FROM bitwalker/alpine-elixir-phoenix:1.14
+
+ARG RELEASE_VERSION
+ENV RELEASE_VERSION=${RELEASE_VERSION}
+ARG BLOCKSCOUT_VERSION
+ENV BLOCKSCOUT_VERSION=${BLOCKSCOUT_VERSION}
+
+RUN apk --no-cache --update add jq
 
 WORKDIR /app
 
 COPY --from=builder /opt/release/blockscout .
 COPY --from=builder /app/apps/explorer/node_modules ./node_modules
+COPY --from=builder /app/config/config_helper.exs ./config/config_helper.exs
+COPY --from=builder /app/config/config_helper.exs /app/releases/${RELEASE_VERSION}/config_helper.exs
+
