@@ -99,7 +99,7 @@ defmodule BlockScoutWeb.BlockTransactionController do
   def index(conn, %{"block_hash_or_number" => formatted_block_hash_or_number}) do
     case param_block_hash_or_number_to_block(formatted_block_hash_or_number,
            necessity_by_association: %{
-             [miner: :names] => :required,
+             [miner: :names] => :optional,
              :uncles => :optional,
              :nephews => :optional,
              :rewards => :optional
@@ -133,7 +133,7 @@ defmodule BlockScoutWeb.BlockTransactionController do
     end
   end
 
-  defp param_block_hash_or_number_to_block("0x" <> _ = param, options) do
+  def param_block_hash_or_number_to_block("0x" <> _ = param, options) do
     case string_to_block_hash(param) do
       {:ok, hash} ->
         hash_to_block(hash, options)
@@ -143,8 +143,8 @@ defmodule BlockScoutWeb.BlockTransactionController do
     end
   end
 
-  defp param_block_hash_or_number_to_block(number_string, options)
-       when is_binary(number_string) do
+  def param_block_hash_or_number_to_block(number_string, options)
+      when is_binary(number_string) do
     case BlockScoutWeb.Chain.param_to_block_number(number_string) do
       {:ok, number} ->
         number_to_block(number, options)

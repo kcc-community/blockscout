@@ -677,6 +677,7 @@ defmodule BlockScoutWeb.Etherscan do
   }
 
   @token_id_type %{
+    name: "Token ID",
     type: "integer",
     definition: "id of token",
     example: ~s("0")
@@ -867,8 +868,21 @@ defmodule BlockScoutWeb.Etherscan do
         definition: "The transferred amount.",
         example: ~s("663046792267785498951364")
       },
+      values: %{
+        type: "array",
+        array_type: %{
+          name: "Transferred amount",
+          type: "integer",
+          definition: "The transferred amount of particular token instance."
+        },
+        definition: "Transferred amounts of token instances in ERC-1155 batch transfer corresponding to tokenIDs field."
+      },
       tokenName: @token_name_type,
       tokenID: @token_id_type,
+      tokenIDs: %{
+        type: "array",
+        array_type: @token_id_type
+      },
       tokenSymbol: @token_symbol_type,
       tokenDecimal: @token_decimal_type,
       transactionIndex: @transaction_index_type,
@@ -1226,7 +1240,7 @@ defmodule BlockScoutWeb.Etherscan do
 
         latest will be the latest balance in a *consensus* block.
         earliest will be the first recorded balance for the address.
-        pending will be the latest balance in consensus *or* nonconcensus blocks.
+        pending will be the latest balance in consensus *or* nonconsensus blocks.
         """
       }
     ],
@@ -1406,12 +1420,12 @@ defmodule BlockScoutWeb.Etherscan do
           "A string representing the order by block number direction. Defaults to descending order. Available values: asc, desc"
       },
       %{
-        key: "startblock",
+        key: "start_block",
         type: "integer",
         description: "A nonnegative integer that represents the starting block number."
       },
       %{
-        key: "endblock",
+        key: "end_block",
         type: "integer",
         description: "A nonnegative integer that represents the ending block number."
       },
@@ -1428,7 +1442,7 @@ defmodule BlockScoutWeb.Etherscan do
           "A nonnegative integer that represents the maximum number of records to return when paginating. 'page' must be provided in conjunction."
       },
       %{
-        key: "filterby",
+        key: "filter_by",
         type: "string",
         description: """
         A string representing the field to filter by. If none is given
@@ -1437,12 +1451,12 @@ defmodule BlockScoutWeb.Etherscan do
         """
       },
       %{
-        key: "starttimestamp",
+        key: "start_timestamp",
         type: "unix timestamp",
         description: "Represents the starting block timestamp."
       },
       %{
-        key: "endtimestamp",
+        key: "end_timestamp",
         type: "unix timestamp",
         description: "Represents the ending block timestamp."
       }
@@ -1482,7 +1496,7 @@ defmodule BlockScoutWeb.Etherscan do
         placeholder: "transactionHash",
         type: "string",
         description:
-          "Transaction hash. Hash of contents of the transaction. A transcation hash or address hash is required."
+          "Transaction hash. Hash of contents of the transaction. A transaction hash or address hash is required."
       }
     ],
     optional_params: [
@@ -1499,13 +1513,13 @@ defmodule BlockScoutWeb.Etherscan do
           "A string representing the order by block number direction. Defaults to ascending order. Available values: asc, desc. WARNING: Only available if 'address' is provided."
       },
       %{
-        key: "startblock",
+        key: "start_block",
         type: "integer",
         description:
           "A nonnegative integer that represents the starting block number. WARNING: Only available if 'address' is provided."
       },
       %{
-        key: "endblock",
+        key: "end_block",
         type: "integer",
         description:
           "A nonnegative integer that represents the ending block number. WARNING: Only available if 'address' is provided."
@@ -1574,12 +1588,12 @@ defmodule BlockScoutWeb.Etherscan do
           "A string representing the order by block number direction. Defaults to ascending order. Available values: asc, desc"
       },
       %{
-        key: "startblock",
+        key: "start_block",
         type: "integer",
         description: "A nonnegative integer that represents the starting block number."
       },
       %{
-        key: "endblock",
+        key: "end_block",
         type: "integer",
         description: "A nonnegative integer that represents the ending block number."
       },
@@ -2176,7 +2190,7 @@ defmodule BlockScoutWeb.Etherscan do
 
   @block_eth_block_number_action %{
     name: "eth_block_number",
-    description: "Mimics Ethereum JSON RPC's eth_blockNumber. Returns the lastest block number",
+    description: "Mimics Ethereum JSON RPC's eth_blockNumber. Returns the latest block number",
     required_params: [],
     optional_params: [
       %{
@@ -2316,6 +2330,18 @@ defmodule BlockScoutWeb.Etherscan do
         type: "string",
         description:
           "Ensures that none of the returned contracts were decompiled with the provided version. Ignored unless filtering for decompiled contracts."
+      },
+      %{
+        key: "verified_at_start_timestamp",
+        type: "unix timestamp",
+        description:
+          "Represents the starting timestamp when contracts verified. Taking into account only with `verified` filter."
+      },
+      %{
+        key: "verified_at_end_timestamp",
+        type: "unix timestamp",
+        description:
+          "Represents the ending timestamp when contracts verified. Taking into account only with `verified` filter."
       }
     ],
     responses: [
@@ -2663,7 +2689,7 @@ defmodule BlockScoutWeb.Etherscan do
     ],
     optional_params: [
       %{
-        key: "constructorArguements",
+        key: "constructorArguments",
         type: "string",
         description: "The constructor argument data provided."
       },

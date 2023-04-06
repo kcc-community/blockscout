@@ -1,8 +1,11 @@
 defmodule BlockScoutWeb.Tokens.ContractController do
   use BlockScoutWeb, :controller
 
-  alias BlockScoutWeb.{AccessHelpers, TabHelpers}
-  alias Explorer.{Chain, Market}
+  import BlockScoutWeb.Account.AuthController, only: [current_user: 1]
+  import BlockScoutWeb.Models.GetAddressTags, only: [get_address_tags: 2]
+
+  alias BlockScoutWeb.{AccessHelper, TabHelper}
+  alias Explorer.Chain
   alias Explorer.Chain.Address
 
   def index(conn, %{"token_id" => address_hash_string} = params) do
@@ -11,19 +14,19 @@ defmodule BlockScoutWeb.Tokens.ContractController do
     with {:ok, address_hash} <- Chain.string_to_address_hash(address_hash_string),
          :ok <- Chain.check_verified_smart_contract_exists(address_hash),
          {:ok, token} <- Chain.token_from_address_hash(address_hash, options),
-         {:ok, false} <- AccessHelpers.restricted_access?(address_hash_string, params) do
+         {:ok, false} <- AccessHelper.restricted_access?(address_hash_string, params) do
       %{type: type, action: action} =
         cond do
-          TabHelpers.tab_active?("read-contract", conn.request_path) ->
+          TabHelper.tab_active?("read-contract", conn.request_path) ->
             %{type: :regular, action: :read}
 
-          TabHelpers.tab_active?("write-contract", conn.request_path) ->
+          TabHelper.tab_active?("write-contract", conn.request_path) ->
             %{type: :regular, action: :write}
 
-          TabHelpers.tab_active?("read-proxy", conn.request_path) ->
+          TabHelper.tab_active?("read-proxy", conn.request_path) ->
             %{type: :proxy, action: :read}
 
-          TabHelpers.tab_active?("write-proxy", conn.request_path) ->
+          TabHelper.tab_active?("write-proxy", conn.request_path) ->
             %{type: :proxy, action: :write}
         end
 
@@ -32,8 +35,9 @@ defmodule BlockScoutWeb.Tokens.ContractController do
         "index.html",
         type: type,
         action: action,
-        token: Market.add_price(token),
-        counters_path: token_path(conn, :token_counters, %{"id" => Address.checksum(address_hash)})
+        token: token,
+        counters_path: token_path(conn, :token_counters, %{"id" => Address.checksum(address_hash)}),
+        tags: get_address_tags(address_hash, current_user(conn))
       )
     else
       {:restricted_access, _} ->

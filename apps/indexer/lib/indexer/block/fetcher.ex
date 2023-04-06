@@ -29,7 +29,7 @@ defmodule Indexer.Block.Fetcher do
     UncleBlock
   }
 
-  alias Indexer.Tracer
+  alias Indexer.{Prometheus, Tracer}
 
   alias Indexer.Transform.{
     AddressCoinBalances,
@@ -37,7 +37,8 @@ defmodule Indexer.Block.Fetcher do
     Addresses,
     AddressTokenBalances,
     MintTransfers,
-    TokenTransfers
+    TokenTransfers,
+    TransactionActions
   }
 
   alias Indexer.Transform.Blocks, as: TransformBlocks
@@ -121,6 +122,9 @@ defmodule Indexer.Block.Fetcher do
         _.._ = range
       )
       when callback_module != nil do
+    {fetch_time, fetched_blocks} =
+      :timer.tc(fn -> EthereumJSONRPC.fetch_blocks_by_range(range, json_rpc_named_arguments) end)
+
     with {:blocks,
           {:ok,
            %Blocks{
@@ -128,12 +132,13 @@ defmodule Indexer.Block.Fetcher do
              transactions_params: transactions_params_without_receipts,
              block_second_degree_relations_params: block_second_degree_relations_params,
              errors: blocks_errors
-           }}} <- {:blocks, EthereumJSONRPC.fetch_blocks_by_range(range, json_rpc_named_arguments)},
+           }}} <- {:blocks, fetched_blocks},
          blocks = TransformBlocks.transform_blocks(blocks_params),
          {:receipts, {:ok, receipt_params}} <- {:receipts, Receipts.fetch(state, transactions_params_without_receipts)},
          %{logs: logs, receipts: receipts} = receipt_params,
          transactions_with_receipts = Receipts.put(transactions_params_without_receipts, receipts),
          %{token_transfers: token_transfers, tokens: tokens} = TokenTransfers.parse(logs),
+         %{transaction_actions: transaction_actions} = TransactionActions.parse(logs),
          %{mint_transfers: mint_transfers} = MintTransfers.parse(logs),
          %FetchedBeneficiaries{params_set: beneficiary_params_set, errors: beneficiaries_errors} =
            fetch_beneficiaries(blocks, transactions_with_receipts, json_rpc_named_arguments),
@@ -144,7 +149,8 @@ defmodule Indexer.Block.Fetcher do
              logs: logs,
              mint_transfers: mint_transfers,
              token_transfers: token_transfers,
-             transactions: transactions_with_receipts
+             transactions: transactions_with_receipts,
+             transaction_actions: transaction_actions
            }),
          coin_balances_params_set =
            %{
@@ -163,6 +169,8 @@ defmodule Indexer.Block.Fetcher do
          beneficiaries_with_gas_payment =
            beneficiaries_with_gas_payment(blocks, beneficiary_params_set, transactions_with_receipts),
          address_token_balances = AddressTokenBalances.params_set(%{token_transfers_params: token_transfers}),
+         transaction_actions =
+           Enum.map(transaction_actions, fn action -> Map.put(action, :data, Map.delete(action.data, :block_number)) end),
          {:ok, inserted} <-
            __MODULE__.import(
              state,
@@ -177,9 +185,11 @@ defmodule Indexer.Block.Fetcher do
                logs: %{params: logs},
                token_transfers: %{params: token_transfers},
                tokens: %{on_conflict: :nothing, params: tokens},
-               transactions: %{params: transactions_with_receipts}
+               transactions: %{params: transactions_with_receipts},
+               transaction_actions: %{params: transaction_actions}
              }
            ) do
+      Prometheus.Instrumenter.block_batch_fetch(fetch_time, callback_module)
       result = {:ok, %{inserted: inserted, errors: blocks_errors}}
       update_block_cache(inserted[:blocks])
       update_transactions_cache(inserted[:transactions])
@@ -231,7 +241,15 @@ defmodule Indexer.Block.Fetcher do
         }
       )
 
-    callback_module.import(state, options_with_broadcast)
+    {import_time, result} = :timer.tc(fn -> callback_module.import(state, options_with_broadcast) end)
+
+    no_blocks_to_import = length(options_with_broadcast.blocks.params)
+
+    if no_blocks_to_import != 0 do
+      Prometheus.Instrumenter.block_import(import_time / no_blocks_to_import, callback_module)
+    end
+
+    result
   end
 
   def async_import_token_instances(%{token_transfers: token_transfers}) do

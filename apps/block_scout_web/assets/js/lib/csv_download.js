@@ -2,6 +2,8 @@ import * as Pikaday from 'pikaday'
 import moment from 'moment'
 import $ from 'jquery'
 import Cookies from 'js-cookie'
+import Swal from 'sweetalert2'
+import { getThemeMode } from './dark_mode'
 
 const DATE_FORMAT = 'YYYY-MM-DD'
 
@@ -28,6 +30,7 @@ const _instance2 = new Pikaday({
 })
 
 $button.on('click', () => {
+  // @ts-ignore
   // eslint-disable-next-line
   const recaptchaResponse = grecaptcha.getResponse()
   if (recaptchaResponse) {
@@ -52,6 +55,7 @@ $button.on('click', () => {
       $button.prop('disabled', false)
       clearInterval(interval)
       Cookies.remove('csv-downloaded')
+      // @ts-ignore
       // eslint-disable-next-line
       grecaptcha.reset()
     }
@@ -80,3 +84,30 @@ function replaceUrlParam (url, paramName, paramValue) {
   url = url.replace(/[?#]$/, '')
   return url + (url.indexOf('?') > 0 ? '&' : '?') + paramName + '=' + paramValue
 }
+
+const onloadCallback = function () {
+  // @ts-ignore
+  // eslint-disable-next-line
+  const reCaptchaClientKey = document.getElementById('re-captcha-client-key').value
+  if (reCaptchaClientKey) {
+    // @ts-ignore
+    // eslint-disable-next-line
+    grecaptcha.render('recaptcha', {
+      sitekey: reCaptchaClientKey,
+      theme: getThemeMode(),
+      callback: function () {
+        // @ts-ignore
+        document.getElementById('export-csv-button').disabled = false
+      }
+    })
+  } else {
+    Swal.fire({
+      title: 'Warning',
+      html: 'CSV download will not work since reCAPTCHA is not configured. Please advise server maintainer to configure RE_CAPTCHA_CLIENT_KEY and RE_CAPTCHA_SECRET_KEY environment variables.',
+      icon: 'warning'
+    })
+  }
+}
+
+// @ts-ignore
+window.onloadCallback = onloadCallback

@@ -4,7 +4,7 @@ defmodule EthereumJSONRPC do
 
   ## Configuration
 
-  Configuration for parity URLs can be provided with the following mix config:
+  Configuration for Nethermind URLs can be provided with the following mix config:
 
       config :ethereum_jsonrpc,
         url: "http://localhost:8545",
@@ -83,7 +83,7 @@ defmodule EthereumJSONRPC do
    * `:transport` - the `t:EthereumJSONRPC.Transport.t/0` callback module
    * `:transport_options` - options passed to `c:EthereumJSONRPC.Transport.json_rpc/2`
    * `:variant` - the `t:EthereumJSONRPC.Variant.t/0` callback module
-   * `:throttle_timout` - the maximum amount of time in milliseconds to throttle
+   * `:throttle_timeout` - the maximum amount of time in milliseconds to throttle
      before automatically returning a timeout. Defaults to #{@default_throttle_timeout} milliseconds.
   """
   @type json_rpc_named_arguments :: [
@@ -464,7 +464,6 @@ defmodule EthereumJSONRPC do
   end
 
   # We can only depend on implementations supporting 64-bit integers:
-  # * Parity only supports u64 (https://github.com/paritytech/jsonrpc-core/blob/f2c61edb817e344d92ab3baf872fa77d1602430a/src/id.rs#L13)
   # * Ganache only supports u32 (https://github.com/trufflesuite/ganache-core/issues/190)
   def unique_request_id do
     <<unique_request_id::big-integer-size(4)-unit(8)>> = :crypto.strong_rand_bytes(4)
