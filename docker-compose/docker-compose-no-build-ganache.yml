@@ -1,22 +1,26 @@
 version: '3.8'
 
 services:
+  redis_db:
+    extends:
+      file: ./services/docker-compose-redis.yml
+      service: redis_db
+
   db:
-    image: postgres:14
-    restart: always
-    container_name: 'postgres'
-    environment:
-        POSTGRES_PASSWORD: ''
-        POSTGRES_USER: 'postgres'
-        POSTGRES_HOST_AUTH_METHOD: 'trust'
-    ports:
-      - 7432:5432
+    extends:
+      file: ./services/docker-compose-db.yml
+      service: db
 
   blockscout:
+    platform: linux/x86_64
     depends_on:
       - db
+      - smart-contract-verifier
+      - redis_db
     image: blockscout/blockscout:${DOCKER_TAG:-latest}
+    pull_policy: always
     restart: always
+    stop_grace_period: 5m
     container_name: 'blockscout'
     links:
       - db:database
@@ -29,6 +33,7 @@ services:
         ETHEREUM_JSONRPC_VARIANT: 'ganache'
         ETHEREUM_JSONRPC_HTTP_URL: http://host.docker.internal:8545/
         ETHEREUM_JSONRPC_WS_URL: ws://host.docker.internal:8545/
+        INDEXER_DISABLE_INTERNAL_TRANSACTIONS_FETCHER: 'true'
         INDEXER_DISABLE_PENDING_TRANSACTIONS_FETCHER: 'true'
         DATABASE_URL: postgresql://postgres:@host.docker.internal:7432/blockscout?ssl=false
         ECTO_USE_SSL: 'false'
@@ -36,4 +41,20 @@ services:
         CHAIN_ID: '1337'
     ports:
       - 4000:4000
+    volumes:
+      - ./logs/:/app/logs/
 
+  smart-contract-verifier:
+    extends:
+      file: ./services/docker-compose-smart-contract-verifier.yml
+      service: smart-contract-verifier
+
+  visualizer:
+    extends:
+      file: ./services/docker-compose-visualizer.yml
+      service: visualizer
+
+  sig-provider:
+    extends:
+      file: ./services/docker-compose-sig-provider.yml
+      service: sig-provider

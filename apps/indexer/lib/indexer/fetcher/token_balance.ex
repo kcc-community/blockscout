@@ -13,7 +13,7 @@ defmodule Indexer.Fetcher.TokenBalance do
   that always raise errors interacting with the Smart Contract.
   """
 
-  use Indexer.Fetcher
+  use Indexer.Fetcher, restart: :permanent
   use Spandex.Decorators
 
   require Logger
@@ -166,15 +166,19 @@ defmodule Indexer.Fetcher.TokenBalance do
       if token_balance.token_type do
         token_balance
       else
-        token_type = Chain.get_token_type(token_balance.token_contract_address_hash)
-
-        if token_type do
-          Map.put(token_balance, :token_type, token_type)
-        else
-          token_balance
-        end
+        put_token_type_to_balance_object(token_balance)
       end
     end)
+  end
+
+  defp put_token_type_to_balance_object(token_balance) do
+    token_type = Chain.get_token_type(token_balance.token_contract_address_hash)
+
+    if token_type do
+      Map.put(token_balance, :token_type, token_type)
+    else
+      token_balance
+    end
   end
 
   defp entry(

@@ -33,6 +33,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
   alias Indexer.{Block, Tracer}
   alias Indexer.Block.Realtime.TaskSupervisor
   alias Indexer.Fetcher.CoinBalance
+  alias Indexer.Prometheus
   alias Indexer.Transform.Addresses
   alias Timex.Duration
 
@@ -40,8 +41,14 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
   @minimum_safe_polling_period :timer.seconds(1)
 
+  @shutdown_after :timer.minutes(1)
+
   @enforce_keys ~w(block_fetcher)a
-  defstruct ~w(block_fetcher subscription previous_number max_number_seen timer)a
+
+  defstruct block_fetcher: nil,
+            subscription: nil,
+            previous_number: nil,
+            timer: nil
 
   @type t :: %__MODULE__{
           block_fetcher: %Block.Fetcher{
@@ -53,7 +60,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
           },
           subscription: Subscription.t(),
           previous_number: pos_integer() | nil,
-          max_number_seen: pos_integer() | nil
+          timer: reference()
         }
 
   def start_link([arguments, gen_server_options]) do
@@ -81,7 +88,6 @@ defmodule Indexer.Block.Realtime.Fetcher do
           block_fetcher: %Block.Fetcher{} = block_fetcher,
           subscription: %Subscription{} = subscription,
           previous_number: previous_number,
-          max_number_seen: max_number_seen,
           timer: timer
         } = state
       )
@@ -94,9 +100,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
     # Subscriptions don't support getting all the blocks and transactions data,
     # so we need to go back and get the full block
-    start_fetch_and_import(number, block_fetcher, previous_number, max_number_seen)
-
-    new_max_number = new_max_number(number, max_number_seen)
+    start_fetch_and_import(number, block_fetcher, previous_number)
 
     Process.cancel_timer(timer)
     new_timer = schedule_polling()
@@ -105,7 +109,6 @@ defmodule Indexer.Block.Realtime.Fetcher do
      %{
        state
        | previous_number: number,
-         max_number_seen: new_max_number,
          timer: new_timer
      }}
   end
@@ -115,19 +118,18 @@ defmodule Indexer.Block.Realtime.Fetcher do
         :poll_latest_block_number,
         %__MODULE__{
           block_fetcher: %Block.Fetcher{json_rpc_named_arguments: json_rpc_named_arguments} = block_fetcher,
-          previous_number: previous_number,
-          max_number_seen: max_number_seen
+          previous_number: previous_number
         } = state
       ) do
-    {number, new_max_number} =
+    new_previous_number =
       case EthereumJSONRPC.fetch_block_number_by_tag("latest", json_rpc_named_arguments) do
-        {:ok, number} when is_nil(max_number_seen) or number > max_number_seen ->
-          start_fetch_and_import(number, block_fetcher, previous_number, number)
+        {:ok, number} when is_nil(previous_number) or number != previous_number ->
+          start_fetch_and_import(number, block_fetcher, previous_number)
 
-          {max_number_seen, number}
+          number
 
         _ ->
-          {previous_number, max_number_seen}
+          previous_number
       end
 
     timer = schedule_polling()
@@ -135,8 +137,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
     {:noreply,
      %{
        state
-       | previous_number: number,
-         max_number_seen: new_max_number,
+       | previous_number: new_previous_number,
          timer: timer
      }}
   end
@@ -167,10 +168,6 @@ defmodule Indexer.Block.Realtime.Fetcher do
   end
 
   defp subscribe_to_new_heads(state, _), do: state
-
-  defp new_max_number(number, nil), do: number
-
-  defp new_max_number(number, max_number_seen), do: max(number, max_number_seen)
 
   defp schedule_polling do
     polling_period =
@@ -238,23 +235,20 @@ defmodule Indexer.Block.Realtime.Fetcher do
     {:ok, []}
   end
 
-  defp start_fetch_and_import(number, block_fetcher, previous_number, max_number_seen) do
-    start_at = determine_start_at(number, previous_number, max_number_seen)
+  def start_fetch_and_import(number, block_fetcher, previous_number) do
+    start_at = determine_start_at(number, previous_number)
+    is_reorg = reorg?(number, previous_number)
 
     for block_number_to_fetch <- start_at..number do
-      args = [block_number_to_fetch, block_fetcher, reorg?(number, max_number_seen)]
-      Task.Supervisor.start_child(TaskSupervisor, __MODULE__, :fetch_and_import_block, args)
+      args = [block_number_to_fetch, block_fetcher, is_reorg]
+      Task.Supervisor.start_child(TaskSupervisor, __MODULE__, :fetch_and_import_block, args, shutdown: @shutdown_after)
     end
   end
 
-  defp determine_start_at(number, nil, nil), do: number
+  defp determine_start_at(number, nil), do: number
 
-  defp determine_start_at(number, nil, max_number_seen) do
-    determine_start_at(number, number - 1, max_number_seen)
-  end
-
-  defp determine_start_at(number, previous_number, max_number_seen) do
-    if reorg?(number, max_number_seen) do
+  defp determine_start_at(number, previous_number) do
+    if reorg?(number, previous_number) do
       # set start_at to NOT fill in skipped numbers
       number
     else
@@ -263,7 +257,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
     end
   end
 
-  defp reorg?(number, max_number_seen) when is_integer(max_number_seen) and number <= max_number_seen do
+  defp reorg?(number, previous_number) when is_integer(previous_number) and number <= previous_number do
     true
   end
 
@@ -273,6 +267,8 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
   @decorate trace(name: "fetch", resource: "Indexer.Block.Realtime.Fetcher.fetch_and_import_block/3", tracer: Tracer)
   def fetch_and_import_block(block_number_to_fetch, block_fetcher, reorg?, retry \\ 3) do
+    Process.flag(:trap_exit, true)
+
     Indexer.Logger.metadata(
       fn ->
         if reorg? do
@@ -295,6 +291,8 @@ defmodule Indexer.Block.Realtime.Fetcher do
     {fetch_duration, result} =
       :timer.tc(fn -> fetch_and_import_range(block_fetcher, block_number_to_fetch..block_number_to_fetch) end)
 
+    Prometheus.Instrumenter.block_full_process(fetch_duration, __MODULE__)
+
     case result do
       {:ok, %{inserted: inserted, errors: []}} ->
         log_import_timings(inserted, fetch_duration, time_before)
@@ -310,6 +308,8 @@ defmodule Indexer.Block.Realtime.Fetcher do
         end)
 
       {:error, {:import = step, [%Changeset{} | _] = changesets}} ->
+        Prometheus.Instrumenter.import_errors()
+
         params = %{
           changesets: changesets,
           block_number_to_fetch: block_number_to_fetch,
@@ -333,6 +333,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
         end
 
       {:error, {:import = step, reason}} ->
+        Prometheus.Instrumenter.import_errors()
         Logger.error(fn -> inspect(reason) end, step: step)
 
       {:error, {step, reason}} ->
@@ -363,6 +364,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
   defp log_import_timings(%{blocks: [%{number: number, timestamp: timestamp}]}, fetch_duration, time_before) do
     node_delay = Timex.diff(time_before, timestamp, :seconds)
+    Prometheus.Instrumenter.node_delay(node_delay)
 
     Logger.debug("Block #{number} fetching duration: #{fetch_duration / 1_000_000}s. Node delay: #{node_delay}s.",
       fetcher: :block_import_timings
@@ -375,7 +377,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
   defp retry_fetch_and_import_block(%{changesets: changesets} = params) do
     if unknown_block_number_error?(changesets) do
-      # Wait half a second to give Parity time to sync.
+      # Wait half a second to give Nethermind time to sync.
       :timer.sleep(500)
 
       number = params.block_number_to_fetch
@@ -429,7 +431,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
         importable_balances_daily_params =
           Enum.map(params_list, fn param ->
             day = Map.get(block_timestamp_map, "#{param.block_number}")
-            Map.put(param, :day, day)
+            (day && Map.put(param, :day, day)) || param
           end)
 
         {:ok,

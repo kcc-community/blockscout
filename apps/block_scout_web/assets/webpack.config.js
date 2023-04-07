@@ -36,6 +36,7 @@ const appJs =
   {
     entry: {
       'app': './js/app.js',
+      'app_extra': './js/app_extra.js',
       'chart-loader': './js/chart-loader.js',
       'balance-chart-loader': './js/balance-chart-loader.js',
       'chain': './js/pages/chain.js',
@@ -48,6 +49,7 @@ const appJs =
       'address-logs': './js/pages/address/logs.js',
       'address-validations': './js/pages/address/validations.js',
       'validated-transactions': './js/pages/transactions.js',
+      'verified-contracts': './js/pages/verified_contracts.js',
       'pending-transactions': './js/pages/pending_transactions.js',
       'transaction': './js/pages/transaction.js',
       'verification-form': './js/pages/verification_form.js',
@@ -56,6 +58,7 @@ const appJs =
       'admin-tasks': './js/pages/admin/tasks.js',
       'token-contract': './js/pages/token_contract.js',
       'smart-contract-helpers': './js/lib/smart_contract/index.js',
+      'sol2uml': './js/pages/sol2uml.js',
       'token-transfers-toggle': './js/lib/token_transfers_toggle.js',
       'try-api': './js/lib/try_api.js',
       'try-eth-api': './js/lib/try_eth_api.js',
@@ -66,11 +69,15 @@ const appJs =
       'text-ad': './js/lib/text_ad.js',
       'banner': './js/lib/banner.js',
       'autocomplete': './js/lib/autocomplete.js',
+      'custom-scrollbar': './js/lib/custom_scrollbar.js',
+      'custom-scrollbar-styles': './css/custom-scrollbar.scss',
       'search-results': './js/pages/search-results/search.js',
       'token-overview': './js/pages/token/overview.js',
       'export-csv': './css/export-csv.scss',
       'csv-download': './js/lib/csv_download.js',
-      'dropzone': './js/lib/dropzone.js'
+      'dropzone': './js/lib/dropzone.js',
+      'delete-item-handler': './js/pages/account/delete_item_handler.js',
+      'public-tags-request-form': './js/lib/public_tags_request_form.js'
     },
     output: {
       filename: '[name].js',
@@ -81,6 +88,10 @@ const appJs =
     },
     module: {
       rules: [
+        {
+          test: /\.css$/,
+          use: ["style-loader", "css-loader"],
+        },
         {
           test: /\.js$/,
           exclude: /node_modules/,
@@ -155,8 +166,10 @@ const appJs =
       ),
       new ContextReplacementPlugin(/moment[\/\\]locale$/, /en/),
       new webpack.DefinePlugin({
-        'process.env.SOCKET_ROOT': JSON.stringify(process.env.SOCKET_ROOT),
-        'process.env.NETWORK_PATH': JSON.stringify(process.env.NETWORK_PATH)
+        'process.env.MIXPANEL_TOKEN': JSON.stringify(process.env.MIXPANEL_TOKEN),
+        'process.env.MIXPANEL_URL': JSON.stringify(process.env.MIXPANEL_URL),
+        'process.env.AMPLITUDE_API_KEY': JSON.stringify(process.env.AMPLITUDE_API_KEY),
+        'process.env.AMPLITUDE_URL': JSON.stringify(process.env.AMPLITUDE_URL)
       }),
       new webpack.ProvidePlugin({
         process: 'process/browser',
