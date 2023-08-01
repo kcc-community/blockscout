@@ -2,6 +2,7 @@ defmodule BlockScoutWeb.API.V2.StatsController do
   use Phoenix.Controller
 
   alias BlockScoutWeb.API.V2.Helper
+  alias BlockScoutWeb.Chain.MarketHistoryChartController
   alias Explorer.{Chain, Market}
   alias Explorer.Chain.Cache.Block, as: BlockCache
   alias Explorer.Chain.Cache.{GasPriceOracle, GasUsage}
@@ -9,7 +10,6 @@ defmodule BlockScoutWeb.API.V2.StatsController do
   alias Explorer.Chain.Supply.RSK
   alias Explorer.Chain.Transaction.History.TransactionStats
   alias Explorer.Counters.AverageBlockTime
-  alias Explorer.ExchangeRates.Token
   alias Timex.Duration
 
   @api_true [api?: true]
@@ -24,7 +24,7 @@ defmodule BlockScoutWeb.API.V2.StatsController do
           :standard
       end
 
-    exchange_rate = Market.get_exchange_rate(Explorer.coin()) || Token.null()
+    exchange_rate = Market.get_coin_exchange_rate()
 
     transaction_stats = Helper.get_transaction_stats()
 
@@ -91,24 +91,35 @@ defmodule BlockScoutWeb.API.V2.StatsController do
   end
 
   def market_chart(conn, _params) do
-    exchange_rate = Market.get_exchange_rate(Explorer.coin()) || Token.null()
+    exchange_rate = Market.get_coin_exchange_rate()
 
     recent_market_history = Market.fetch_recent_history()
+    current_total_supply = available_supply(Chain.supply_for_days(), exchange_rate)
 
-    market_history_data =
+    price_history_data =
       recent_market_history
       |> case do
         [today | the_rest] ->
-          [%{today | closing_price: exchange_rate.usd_value} | the_rest]
+          [
+            %{
+              today
+              | closing_price: exchange_rate.usd_value
+            }
+            | the_rest
+          ]
 
         data ->
           data
       end
-      |> Enum.map(fn day -> Map.take(day, [:closing_price, :date]) end)
+      |> Enum.map(fn day -> Map.take(day, [:closing_price, :market_cap, :date]) end)
+
+    market_history_data =
+      MarketHistoryChartController.encode_market_history_data(price_history_data, current_total_supply)
 
     json(conn, %{
       chart_data: market_history_data,
-      available_supply: available_supply(Chain.supply_for_days(), exchange_rate)
+      # todo: remove when new frontend is ready to use data from chart_data property only
+      available_supply: current_total_supply
     })
   end
 

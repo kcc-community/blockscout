@@ -8,7 +8,6 @@ defmodule BlockScoutWeb.API.V2.AddressView do
   alias BlockScoutWeb.API.V2.Helper
   alias Explorer.{Chain, Market}
   alias Explorer.Chain.{Address, SmartContract}
-  alias Explorer.ExchangeRates.Token
 
   @api_true [api?: true]
 
@@ -37,7 +36,7 @@ defmodule BlockScoutWeb.API.V2.AddressView do
   end
 
   def render("tokens.json", %{tokens: tokens, next_page_params: next_page_params}) do
-    %{"items" => Enum.map(tokens, &prepare_token_balance/1), "next_page_params" => next_page_params}
+    %{"items" => Enum.map(tokens, &prepare_token_balance(&1, true)), "next_page_params" => next_page_params}
   end
 
   def render("addresses.json", %{
@@ -56,13 +55,13 @@ defmodule BlockScoutWeb.API.V2.AddressView do
 
   def prepare_address({address, nonce}) do
     nil
-    |> Helper.address_with_info(address, address.hash)
+    |> Helper.address_with_info(address, address.hash, true)
     |> Map.put(:tx_count, to_string(nonce))
     |> Map.put(:coin_balance, if(address.fetched_coin_balance, do: address.fetched_coin_balance.value))
   end
 
   def prepare_address(address, conn \\ nil) do
-    base_info = Helper.address_with_info(conn, address, address.hash)
+    base_info = Helper.address_with_info(conn, address, address.hash, true)
     is_proxy = AddressView.smart_contract_is_proxy?(address, @api_true)
 
     {implementation_address, implementation_name} =
@@ -78,7 +77,7 @@ defmodule BlockScoutWeb.API.V2.AddressView do
       end
 
     balance = address.fetched_coin_balance && address.fetched_coin_balance.value
-    exchange_rate = (Market.get_exchange_rate(Explorer.coin()) || Token.null()).usd_value
+    exchange_rate = Market.get_coin_exchange_rate().usd_value
 
     creator_hash = AddressView.from_address_hash(address)
     creation_tx = creator_hash && AddressView.transaction_hash(address)
@@ -107,15 +106,25 @@ defmodule BlockScoutWeb.API.V2.AddressView do
       "has_logs" => Chain.check_if_logs_at_address(address.hash, @api_true),
       "has_tokens" => Chain.check_if_tokens_at_address(address.hash, @api_true),
       "has_token_transfers" => Chain.check_if_token_transfers_at_address(address.hash, @api_true),
-      "watchlist_address_id" => Chain.select_watchlist_address_id(get_watchlist_id(conn), address.hash)
+      "watchlist_address_id" => Chain.select_watchlist_address_id(get_watchlist_id(conn), address.hash),
+      "has_beacon_chain_withdrawals" => Chain.check_if_withdrawals_at_address(address.hash, @api_true)
     })
   end
 
-  def prepare_token_balance({token_balance, token}) do
+  def prepare_token_balance(token_balance, fetch_token_instance? \\ false) do
     %{
       "value" => token_balance.value,
-      "token" => TokenView.render("token.json", %{token: token}),
-      "token_id" => token_balance.token_id
+      "token" => TokenView.render("token.json", %{token: token_balance.token}),
+      "token_id" => token_balance.token_id,
+      "token_instance" =>
+        if(fetch_token_instance? && token_balance.token_id,
+          do:
+            fetch_and_render_token_instance(
+              token_balance.token_id,
+              token_balance.token,
+              token_balance.address_hash
+            )
+        )
     }
   end
 
@@ -144,5 +153,20 @@ defmodule BlockScoutWeb.API.V2.AddressView do
       _ ->
         nil
     end
+  end
+
+  def fetch_and_render_token_instance(token_id, token, address_hash) do
+    token_instance =
+      case Chain.erc721_or_erc1155_token_instance_from_token_id_and_token_address(
+             token_id,
+             token.contract_address_hash,
+             @api_true
+           ) do
+        # `%{hash: address_hash}` will match with `address_with_info(_, address_hash)` clause in `BlockScoutWeb.API.V2.Helper`
+        {:ok, token_instance} -> %{token_instance | owner: %{hash: address_hash}}
+        {:error, :not_found} -> %{token_id: token_id, metadata: nil, owner: %{hash: address_hash}}
+      end
+
+    TokenView.render("token_instance.json", %{token_instance: token_instance, token: token})
   end
 end

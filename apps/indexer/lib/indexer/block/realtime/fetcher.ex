@@ -124,9 +124,14 @@ defmodule Indexer.Block.Realtime.Fetcher do
     new_previous_number =
       case EthereumJSONRPC.fetch_block_number_by_tag("latest", json_rpc_named_arguments) do
         {:ok, number} when is_nil(previous_number) or number != previous_number ->
-          start_fetch_and_import(number, block_fetcher, previous_number)
-
-          number
+          if abnormal_gap?(number, previous_number) do
+            new_number = max(number, previous_number)
+            start_fetch_and_import(new_number, block_fetcher, previous_number)
+            new_number
+          else
+            start_fetch_and_import(number, block_fetcher, previous_number)
+            number
+          end
 
         _ ->
           previous_number
@@ -262,6 +267,15 @@ defmodule Indexer.Block.Realtime.Fetcher do
   end
 
   defp reorg?(_, _), do: false
+
+  @default_max_gap 1000
+  defp abnormal_gap?(_number, nil), do: false
+
+  defp abnormal_gap?(number, previous_number) do
+    max_gap = Application.get_env(:indexer, __MODULE__)[:max_gap] || @default_max_gap
+
+    abs(number - previous_number) > max_gap
+  end
 
   @reorg_delay 5_000
 
@@ -414,7 +428,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
        ) do
     case options
          |> fetch_balances_params_list()
-         |> EthereumJSONRPC.fetch_balances(json_rpc_named_arguments) do
+         |> EthereumJSONRPC.fetch_balances(json_rpc_named_arguments, CoinBalance.batch_size()) do
       {:ok, %FetchedBalances{params_list: params_list, errors: []}} ->
         merged_addresses_params =
           %{address_coin_balances: params_list}
@@ -471,7 +485,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
             block_number
 
           _ ->
-            Map.fetch!(address_hash_to_block_number, address_hash)
+            Map.fetch!(address_hash_to_block_number, String.downcase(address_hash))
         end
 
       %{hash_data: address_hash, block_quantity: integer_to_quantity(block_number)}
