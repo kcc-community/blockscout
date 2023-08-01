@@ -9,7 +9,11 @@ import Config
 config :block_scout_web,
   namespace: BlockScoutWeb,
   ecto_repos: [Explorer.Repo, Explorer.Repo.Account],
-  cookie_domain: System.get_env("SESSION_COOKIE_DOMAIN")
+  cookie_domain: System.get_env("SESSION_COOKIE_DOMAIN"),
+  # 604800 seconds, 1 week
+  session_cookie_ttl: 60 * 60 * 24 * 7,
+  invalid_session_key: "invalid_session",
+  api_v2_temp_token_key: "api_v2_temp_token"
 
 config :block_scout_web,
   admin_panel_enabled: System.get_env("ADMIN_PANEL_ENABLED", "") == "true"
@@ -77,8 +81,8 @@ config :prometheus, BlockScoutWeb.Prometheus.Instrumenter,
 config :spandex_phoenix, tracer: BlockScoutWeb.Tracer
 
 config :block_scout_web, BlockScoutWeb.ApiRouter,
-  writing_enabled: System.get_env("DISABLE_WRITE_API") != "true",
-  reading_enabled: System.get_env("DISABLE_READ_API") != "true"
+  writing_enabled: System.get_env("API_V1_WRITE_METHODS_DISABLED") != "true",
+  reading_enabled: System.get_env("API_V1_READ_METHODS_DISABLED") != "true"
 
 config :block_scout_web, BlockScoutWeb.WebRouter, enabled: System.get_env("DISABLE_WEBAPP") != "true"
 

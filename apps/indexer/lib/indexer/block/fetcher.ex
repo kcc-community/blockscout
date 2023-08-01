@@ -130,6 +130,7 @@ defmodule Indexer.Block.Fetcher do
            %Blocks{
              blocks_params: blocks_params,
              transactions_params: transactions_params_without_receipts,
+             withdrawals_params: withdrawals_params,
              block_second_degree_relations_params: block_second_degree_relations_params,
              errors: blocks_errors
            }}} <- {:blocks, fetched_blocks},
@@ -150,14 +151,16 @@ defmodule Indexer.Block.Fetcher do
              mint_transfers: mint_transfers,
              token_transfers: token_transfers,
              transactions: transactions_with_receipts,
-             transaction_actions: transaction_actions
+             transaction_actions: transaction_actions,
+             withdrawals: withdrawals_params
            }),
          coin_balances_params_set =
            %{
              beneficiary_params: MapSet.to_list(beneficiary_params_set),
              blocks_params: blocks,
              logs_params: logs,
-             transactions_params: transactions_with_receipts
+             transactions_params: transactions_with_receipts,
+             withdrawals: withdrawals_params
            }
            |> AddressCoinBalances.params_set(),
          coin_balances_params_daily_set =
@@ -186,15 +189,23 @@ defmodule Indexer.Block.Fetcher do
                token_transfers: %{params: token_transfers},
                tokens: %{on_conflict: :nothing, params: tokens},
                transactions: %{params: transactions_with_receipts},
-               transaction_actions: %{params: transaction_actions}
+               withdrawals: %{params: withdrawals_params}
              }
-           ) do
+           ),
+         {:tx_actions, {:ok, inserted_tx_actions}} <-
+           {:tx_actions,
+            Chain.import(%{
+              transaction_actions: %{params: transaction_actions},
+              timeout: :infinity
+            })} do
+      inserted = Map.merge(inserted, inserted_tx_actions)
       Prometheus.Instrumenter.block_batch_fetch(fetch_time, callback_module)
       result = {:ok, %{inserted: inserted, errors: blocks_errors}}
       update_block_cache(inserted[:blocks])
       update_transactions_cache(inserted[:transactions])
       update_addresses_cache(inserted[:addresses])
       update_uncles_cache(inserted[:block_second_degree_relations])
+      update_withdrawals_cache(inserted[:withdrawals])
       result
     else
       {step, {:error, reason}} -> {:error, {step, reason}}
@@ -222,6 +233,15 @@ defmodule Indexer.Block.Fetcher do
 
   defp update_uncles_cache(updated_relations) do
     Uncles.update_from_second_degree_relations(updated_relations)
+  end
+
+  defp update_withdrawals_cache([_ | _] = withdrawals) do
+    %{index: index} = List.last(withdrawals)
+    Chain.upsert_count_withdrawals(index)
+  end
+
+  defp update_withdrawals_cache(_) do
+    :ok
   end
 
   def import(
@@ -544,6 +564,7 @@ defmodule Indexer.Block.Fetcher do
            hash: hash
          } = address_params
        ) do
-    {{hash, fetched_coin_balance_block_number}, Map.delete(address_params, :fetched_coin_balance_block_number)}
+    {{String.downcase(hash), fetched_coin_balance_block_number},
+     Map.delete(address_params, :fetched_coin_balance_block_number)}
   end
 end

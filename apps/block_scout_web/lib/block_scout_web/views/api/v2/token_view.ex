@@ -15,7 +15,9 @@ defmodule BlockScoutWeb.API.V2.TokenView do
       "type" => token.type,
       "holders" => token.holder_count && to_string(token.holder_count),
       "exchange_rate" => exchange_rate(token),
-      "total_supply" => token.total_supply
+      "total_supply" => token.total_supply,
+      "icon_url" => token.icon_url,
+      "circulating_market_cap" => token.circulating_market_cap
     }
   end
 
@@ -54,7 +56,7 @@ defmodule BlockScoutWeb.API.V2.TokenView do
 
   def prepare_token_balance(token_balance, token) do
     %{
-      "address" => Helper.address_with_info(nil, token_balance.address, token_balance.address_hash),
+      "address" => Helper.address_with_info(nil, token_balance.address, token_balance.address_hash, false),
       "value" => token_balance.value,
       "token_id" => token_balance.token_id,
       "token" => render("token.json", %{token: token})
@@ -70,7 +72,7 @@ defmodule BlockScoutWeb.API.V2.TokenView do
       "id" => instance.token_id,
       "metadata" => instance.metadata,
       "owner" =>
-        if(is_unique, do: instance.owner && Helper.address_with_info(nil, instance.owner, instance.owner.hash)),
+        if(is_unique, do: instance.owner && Helper.address_with_info(nil, instance.owner, instance.owner.hash, false)),
       "token" => render("token.json", %{token: token}),
       "external_app_url" => NFTHelper.external_url(instance),
       "animation_url" => instance.metadata && NFTHelper.retrieve_image(instance.metadata["animation_url"]),

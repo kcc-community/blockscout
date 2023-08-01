@@ -532,6 +532,8 @@ defmodule Indexer.Block.Catchup.BoundIntervalSupervisorTest do
       # from `setup :state`
       assert_received :catchup_index
 
+      Process.sleep(50)
+
       assert {:noreply,
               %Catchup.BoundIntervalSupervisor{fetcher: %Catchup.Fetcher{}, task: %Task{pid: pid, ref: ref}} =
                 catchup_index_state} = Catchup.BoundIntervalSupervisor.handle_info(:catchup_index, state)

@@ -31,10 +31,20 @@ $button.on('click', () => {
   // @ts-ignore
   // eslint-disable-next-line
   const reCaptchaV3ClientKey = document.getElementById('js-re-captcha-v3-client-key').value
+  // @ts-ignore
+  // eslint-disable-next-line
+  const reCaptchaDisabledRaw = document.getElementById('js-re-captcha-disabled').value
+  const reCaptchaDisabled = reCaptchaDisabledRaw && reCaptchaDisabledRaw.toLowerCase() === 'true'
   const addressHash = $button.data('address-hash')
   const from = $('.js-datepicker-from').val()
   const to = $('.js-datepicker-to').val()
-  if (reCaptchaV3ClientKey) {
+  const urlParams = new URLSearchParams(window.location.search)
+  const filterType = urlParams.get('filter_type')
+  const filterValue = urlParams.get('filter_value')
+  const baseURL = `${$button.data('link')}?address_id=${addressHash}&from_period=${from}&to_period=${to}&filter_type=${filterType}&filter_value=${filterValue}`
+  if (reCaptchaDisabled) {
+    download(baseURL)
+  } else if (reCaptchaV3ClientKey) {
     disableBtnWithSpinner()
     // @ts-ignore
     // eslint-disable-next-line
@@ -43,7 +53,7 @@ $button.on('click', () => {
       // eslint-disable-next-line
       grecaptcha.execute(reCaptchaV3ClientKey, { action: 'login' })
         .then(function (token) {
-          const url = `${$button.data('link')}?address_id=${addressHash}&from_period=${from}&to_period=${to}&recaptcha_response=${token}`
+          const url = `${baseURL}&recaptcha_response=${token}`
 
           download(url)
         })
@@ -54,7 +64,7 @@ $button.on('click', () => {
   const recaptchaResponse = grecaptcha.getResponse()
     if (recaptchaResponse) {
       disableBtnWithSpinner()
-      const url = `${$button.data('link')}?address_id=${addressHash}&from_period=${from}&to_period=${to}&recaptcha_response=${recaptchaResponse}`
+      const url = `${baseURL}&recaptcha_response=${recaptchaResponse}`
 
       download(url, true, true)
     }
@@ -80,7 +90,13 @@ $button.on('click', () => {
           const downloadUrl = URL.createObjectURL(blob)
           const a = document.createElement('a')
           a.href = downloadUrl
-          a.download = `${$button.data('type')}_for_${addressHash}_from_${from}_to_${to}.csv`
+          let fileName = `${$button.data('type')}_for_${addressHash}_from_${from}_to_${to}`
+          if (filterType && filterValue) {
+            fileName = `${fileName}_with_filter_type_${filterType}_value_${filterValue}.csv`
+          } else {
+            fileName = `${fileName}.csv`
+          }
+          a.download = fileName
           document.body.appendChild(a)
           a.click()
 
@@ -118,7 +134,7 @@ $button.on('click', () => {
 const onloadCallback = function () {
   // @ts-ignore
   // eslint-disable-next-line
-  const reCaptchaClientKey = document.getElementById('re-captcha-client-key').value
+  const reCaptchaClientKey = document.getElementById('js-re-captcha-client-key').value
   // @ts-ignore
   // eslint-disable-next-line
   grecaptcha.render('recaptcha', {

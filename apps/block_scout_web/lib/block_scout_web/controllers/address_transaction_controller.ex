@@ -23,7 +23,6 @@ defmodule BlockScoutWeb.AddressTransactionController do
 
   alias Explorer.Chain.Wei
 
-  alias Explorer.ExchangeRates.Token
   alias Indexer.Fetcher.CoinBalanceOnDemand
   alias Phoenix.View
 
@@ -124,7 +123,7 @@ defmodule BlockScoutWeb.AddressTransactionController do
         "index.html",
         address: address,
         coin_balance_status: CoinBalanceOnDemand.trigger_fetch(address),
-        exchange_rate: Market.get_exchange_rate(Explorer.coin()) || Token.null(),
+        exchange_rate: Market.get_coin_exchange_rate(),
         filter: params["filter"],
         counters_path: address_path(conn, :address_counters, %{"id" => address_hash_string}),
         current_path: Controller.current_full_path(conn),
@@ -154,7 +153,7 @@ defmodule BlockScoutWeb.AddressTransactionController do
               "index.html",
               address: address,
               coin_balance_status: nil,
-              exchange_rate: Market.get_exchange_rate(Explorer.coin()) || Token.null(),
+              exchange_rate: Market.get_coin_exchange_rate(),
               filter: params["filter"],
               counters_path: address_path(conn, :address_counters, %{"id" => address_hash_string}),
               current_path: Controller.current_full_path(conn),
@@ -187,15 +186,18 @@ defmodule BlockScoutWeb.AddressTransactionController do
            "from_period" => from_period,
            "to_period" => to_period,
            "recaptcha_response" => recaptcha_response
-         },
+         } = params,
          csv_export_module
        )
        when is_binary(address_hash_string) do
     with {:ok, address_hash} <- Chain.string_to_address_hash(address_hash_string),
-         {:ok, address} <- Chain.hash_to_address(address_hash),
+         {:address_exists, true} <- {:address_exists, Chain.address_exists?(address_hash)},
          {:recaptcha, true} <- {:recaptcha, captcha_helper().recaptcha_passed?(recaptcha_response)} do
-      address
-      |> csv_export_module.export(from_period, to_period)
+      filter_type = Map.get(params, "filter_type")
+      filter_value = Map.get(params, "filter_value")
+
+      address_hash
+      |> csv_export_module.export(from_period, to_period, filter_type, filter_value)
       |> Enum.reduce_while(put_resp_params(conn), fn chunk, conn ->
         case Conn.chunk(conn, chunk) do
           {:ok, conn} ->
@@ -209,7 +211,7 @@ defmodule BlockScoutWeb.AddressTransactionController do
       :error ->
         unprocessable_entity(conn)
 
-      {:error, :not_found} ->
+      {:address_exists, false} ->
         not_found(conn)
 
       {:recaptcha, false} ->
@@ -217,72 +219,60 @@ defmodule BlockScoutWeb.AddressTransactionController do
     end
   end
 
+  defp items_csv(
+         conn,
+         %{
+           "address_id" => address_hash_string,
+           "from_period" => from_period,
+           "to_period" => to_period
+         } = params,
+         csv_export_module
+       )
+       when is_binary(address_hash_string) do
+    with {:ok, address_hash} <- Chain.string_to_address_hash(address_hash_string),
+         {:address_exists, true} <- {:address_exists, Chain.address_exists?(address_hash)},
+         true <- Application.get_env(:block_scout_web, :recaptcha)[:is_disabled] do
+      filter_type = Map.get(params, "filter_type")
+      filter_value = Map.get(params, "filter_value")
+
+      address_hash
+      |> csv_export_module.export(from_period, to_period, filter_type, filter_value)
+      |> Enum.reduce_while(put_resp_params(conn), fn chunk, conn ->
+        case Conn.chunk(conn, chunk) do
+          {:ok, conn} ->
+            {:cont, conn}
+
+          {:error, :closed} ->
+            {:halt, conn}
+        end
+      end)
+    else
+      :error ->
+        unprocessable_entity(conn)
+
+      {:address_exists, false} ->
+        not_found(conn)
+
+      false ->
+        not_found(conn)
+    end
+  end
+
   defp items_csv(conn, _, _), do: not_found(conn)
 
   def token_transfers_csv(conn, params) do
-    items_csv(
-      conn,
-      %{
-        "address_id" => params["address_id"],
-        "from_period" => params["from_period"],
-        "to_period" => params["to_period"],
-        "recaptcha_response" => params["recaptcha_response"]
-      },
-      AddressTokenTransferCsvExporter
-    )
+    items_csv(conn, params, AddressTokenTransferCsvExporter)
   end
 
-  def transactions_csv(conn, %{
-        "address_id" => address_hash_string,
-        "from_period" => from_period,
-        "to_period" => to_period,
-        "recaptcha_response" => recaptcha_response
-      }) do
-    items_csv(
-      conn,
-      %{
-        "address_id" => address_hash_string,
-        "from_period" => from_period,
-        "to_period" => to_period,
-        "recaptcha_response" => recaptcha_response
-      },
-      AddressTransactionCsvExporter
-    )
+  def transactions_csv(conn, params) do
+    items_csv(conn, params, AddressTransactionCsvExporter)
   end
 
-  def internal_transactions_csv(conn, %{
-        "address_id" => address_hash_string,
-        "from_period" => from_period,
-        "to_period" => to_period,
-        "recaptcha_response" => recaptcha_response
-      }) do
-    items_csv(
-      conn,
-      %{
-        "address_id" => address_hash_string,
-        "from_period" => from_period,
-        "to_period" => to_period,
-        "recaptcha_response" => recaptcha_response
-      },
-      AddressInternalTransactionCsvExporter
-    )
+  def internal_transactions_csv(conn, params) do
+    items_csv(conn, params, AddressInternalTransactionCsvExporter)
   end
 
-  def logs_csv(conn, %{
-        "address_id" => address_hash_string,
-        "from_period" => from_period,
-        "to_period" => to_period,
-        "recaptcha_response" => recaptcha_response
-      }) do
-    items_csv(
-      conn,
-      %{
-        "address_id" => address_hash_string,
-        "from_period" => from_period,
-        "to_period" => to_period,
-        "recaptcha_response" => recaptcha_response
-      },
-      AddressLogCsvExporter
-    )
+  def logs_csv(conn, params) do
+    items_csv(conn, params, AddressLogCsvExporter)
   end
 end
