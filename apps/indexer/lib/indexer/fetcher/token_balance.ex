@@ -21,22 +21,31 @@ defmodule Indexer.Fetcher.TokenBalance do
   alias Explorer.Chain
   alias Explorer.Chain.Hash
   alias Indexer.{BufferedTask, TokenBalances, Tracer}
+  alias Indexer.Fetcher.TokenBalance.Supervisor, as: TokenBalanceSupervisor
 
   @behaviour BufferedTask
 
-  @defaults [
-    flush_interval: 300,
-    max_batch_size: 100,
-    max_concurrency: 10,
-    task_supervisor: Indexer.Fetcher.TokenBalance.TaskSupervisor
-  ]
+  @default_max_batch_size 100
 
   @max_retries 3
 
-  @spec async_fetch([]) :: :ok
+  @spec async_fetch([
+          %{
+            token_contract_address_hash: Hash.Address.t(),
+            address_hash: Hash.Address.t(),
+            block_number: non_neg_integer(),
+            token_type: String.t(),
+            token_id: non_neg_integer()
+          }
+        ]) :: :ok
   def async_fetch(token_balances) do
-    formatted_params = Enum.map(token_balances, &entry/1)
-    BufferedTask.buffer(__MODULE__, formatted_params, :infinity)
+    if TokenBalanceSupervisor.disabled?() do
+      :ok
+    else
+      formatted_params = Enum.map(token_balances, &entry/1)
+
+      BufferedTask.buffer(__MODULE__, formatted_params, :infinity)
+    end
   end
 
   @doc false
@@ -50,7 +59,7 @@ defmodule Indexer.Fetcher.TokenBalance do
     end
 
     merged_init_opts =
-      @defaults
+      defaults()
       |> Keyword.merge(mergeable_init_options)
       |> Keyword.put(:state, state)
 
@@ -60,11 +69,15 @@ defmodule Indexer.Fetcher.TokenBalance do
   @impl BufferedTask
   def init(initial, reducer, _) do
     {:ok, final} =
-      Chain.stream_unfetched_token_balances(initial, fn token_balance, acc ->
-        token_balance
-        |> entry()
-        |> reducer.(acc)
-      end)
+      Chain.stream_unfetched_token_balances(
+        initial,
+        fn token_balance, acc ->
+          token_balance
+          |> entry()
+          |> reducer.(acc)
+        end,
+        true
+      )
 
     final
   end
@@ -216,5 +229,14 @@ defmodule Indexer.Fetcher.TokenBalance do
       token_type: token_type,
       token_id: token_id
     }
+  end
+
+  defp defaults do
+    [
+      flush_interval: 300,
+      max_batch_size: Application.get_env(:indexer, __MODULE__)[:batch_size] || @default_max_batch_size,
+      max_concurrency: 10,
+      task_supervisor: Indexer.Fetcher.TokenBalance.TaskSupervisor
+    ]
   end
 end

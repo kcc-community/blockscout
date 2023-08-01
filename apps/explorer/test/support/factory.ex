@@ -39,11 +39,12 @@ defmodule Explorer.Factory do
     Token,
     TokenTransfer,
     Token.Instance,
-    Transaction
+    Transaction,
+    Withdrawal
   }
 
   alias Explorer.SmartContract.Helper
-
+  alias Explorer.Tags.{AddressTag, AddressToTag}
   alias Explorer.Market.MarketHistory
   alias Explorer.Repo
 
@@ -137,6 +138,16 @@ defmodule Explorer.Factory do
 
   def tag_transaction_factory do
     %{"name" => sequence("name"), "transaction_hash" => to_string(insert(:transaction).hash)}
+  end
+
+  def address_to_tag_factory do
+    %AddressToTag{
+      tag: %AddressTag{
+        label: sequence("label"),
+        display_name: sequence("display_name")
+      },
+      address: build(:address)
+    }
   end
 
   def account_watchlist_address_factory do
@@ -643,7 +654,9 @@ defmodule Explorer.Factory do
       decimals: 18,
       contract_address: build(:address),
       type: "ERC-20",
-      cataloged: true
+      cataloged: true,
+      icon_url: sequence("https://example.com/icon"),
+      fiat_value: 10.1
     }
   end
 
@@ -817,7 +830,8 @@ defmodule Explorer.Factory do
       abi: contract_code_info.abi,
       contract_code_md5: bytecode_md5,
       verified_via_sourcify: Enum.random([true, false]),
-      is_vyper_contract: Enum.random([true, false])
+      is_vyper_contract: Enum.random([true, false]),
+      verified_via_eth_bytecode_db: Enum.random([true, false])
     }
   end
 
@@ -881,7 +895,7 @@ defmodule Explorer.Factory do
       address: build(:address),
       token_contract_address_hash: insert(:token).contract_address_hash,
       block_number: block_number(),
-      value: Enum.random(1..100_000),
+      value: Enum.random(1_000_000_000_000_000_000..10_000_000_000_000_000_000),
       value_fetched_at: DateTime.utc_now(),
       token_id: token_id,
       token_type: token_type
@@ -945,6 +959,29 @@ defmodule Explorer.Factory do
       from_number: 1,
       to_number: 0
     }
+  end
+
+  def withdrawal_factory do
+    block = build(:block)
+    address = build(:address)
+
+    %Withdrawal{
+      index: withdrawal_index(),
+      validator_index: withdrawal_validator_index(),
+      amount: Enum.random(1..100_000),
+      block: block,
+      block_hash: block.hash,
+      address: address,
+      address_hash: address.hash
+    }
+  end
+
+  def withdrawal_index do
+    sequence("withdrawal_index", & &1)
+  end
+
+  def withdrawal_validator_index do
+    sequence("withdrawal_validator_index", & &1)
   end
 
   def random_bool, do: Enum.random([true, false])

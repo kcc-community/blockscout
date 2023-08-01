@@ -22,6 +22,7 @@ defmodule Explorer.Chain.SmartContract do
   alias Timex.Duration
 
   @burn_address_hash_str "0x0000000000000000000000000000000000000000"
+  @burn_address_hash_str_32 "0x0000000000000000000000000000000000000000000000000000000000000000"
 
   @typep api? :: {:api?, true | false}
 
@@ -214,6 +215,7 @@ defmodule Explorer.Chain.SmartContract do
   * `implementation_address_hash` - address hash of the proxy's implementation if any
   * `autodetect_constructor_args` - field was added for storing user's choice
   * `is_yul` - field was added for storing user's choice
+  * `verified_via_eth_bytecode_db` - whether contract automatically verified via eth-bytecode-db or not.
   """
 
   @type t :: %Explorer.Chain.SmartContract{
@@ -237,7 +239,8 @@ defmodule Explorer.Chain.SmartContract do
           implementation_fetched_at: DateTime.t(),
           implementation_address_hash: Hash.Address.t(),
           autodetect_constructor_args: boolean | nil,
-          is_yul: boolean | nil
+          is_yul: boolean | nil,
+          verified_via_eth_bytecode_db: boolean | nil
         }
 
   schema "smart_contracts" do
@@ -264,6 +267,7 @@ defmodule Explorer.Chain.SmartContract do
     field(:autodetect_constructor_args, :boolean, virtual: true)
     field(:is_yul, :boolean, virtual: true)
     field(:metadata_from_verified_twin, :boolean, virtual: true)
+    field(:verified_via_eth_bytecode_db, :boolean)
 
     has_many(
       :decompiled_smart_contracts,
@@ -308,7 +312,8 @@ defmodule Explorer.Chain.SmartContract do
       :implementation_name,
       :compiler_settings,
       :implementation_address_hash,
-      :implementation_fetched_at
+      :implementation_fetched_at,
+      :verified_via_eth_bytecode_db
     ])
     |> validate_required([
       :name,
@@ -327,7 +332,7 @@ defmodule Explorer.Chain.SmartContract do
         attrs,
         error,
         error_message,
-        json_verification \\ false
+        verification_with_files? \\ false
       ) do
     validated =
       smart_contract
@@ -348,14 +353,15 @@ defmodule Explorer.Chain.SmartContract do
         :bytecode_checked_at,
         :contract_code_md5,
         :implementation_name,
-        :autodetect_constructor_args
+        :autodetect_constructor_args,
+        :verified_via_eth_bytecode_db
       ])
-      |> (&if(json_verification,
+      |> (&if(verification_with_files?,
             do: &1,
             else: validate_required(&1, [:compiler_version, :optimization, :address_hash, :contract_code_md5])
           )).()
 
-    field_to_put_message = if json_verification, do: :files, else: select_error_field(error)
+    field_to_put_message = if verification_with_files?, do: :files, else: select_error_field(error)
 
     if error_message do
       add_error(validated, field_to_put_message, error_message(error, error_message))
@@ -436,7 +442,10 @@ defmodule Explorer.Chain.SmartContract do
 
   defp error_message(string) when is_binary(string), do: string
 
-  defp error_message(_), do: "There was an error validating your contract, please try again."
+  defp error_message(error) do
+    Logger.warn(fn -> ["Unknown verifier error: ", inspect(error)] end)
+    "There was an error validating your contract, please try again."
+  end
 
   defp error_message(:compilation, error_message), do: "There was an error compiling your contract: #{error_message}"
 
@@ -652,6 +661,12 @@ defmodule Explorer.Chain.SmartContract do
         Map.get(method, "name") == "implementation" && Map.get(method, "stateMutability") == "view"
       end)
 
+    get_implementation_method_abi =
+      abi
+      |> Enum.find(fn method ->
+        Map.get(method, "name") == "getImplementation" && Map.get(method, "stateMutability") == "view"
+      end)
+
     master_copy_method_abi =
       abi
       |> Enum.find(fn method ->
@@ -661,7 +676,10 @@ defmodule Explorer.Chain.SmartContract do
     implementation_address =
       cond do
         implementation_method_abi ->
-          get_implementation_address_hash_basic(proxy_address_hash, abi)
+          get_implementation_address_hash_basic("5c60da1b", proxy_address_hash, abi)
+
+        get_implementation_method_abi ->
+          get_implementation_address_hash_basic("aaf10f42", proxy_address_hash, abi)
 
         master_copy_method_abi ->
           get_implementation_address_hash_from_master_copy_pattern(proxy_address_hash)
@@ -691,7 +709,7 @@ defmodule Explorer.Chain.SmartContract do
              json_rpc_named_arguments
            ) do
         {:ok, empty_address}
-        when empty_address in ["0x", "0x0", "0x0000000000000000000000000000000000000000000000000000000000000000", nil] ->
+        when empty_address in ["0x", "0x0", @burn_address_hash_str_32, nil] ->
           fetch_beacon_proxy_implementation(proxy_address_hash, json_rpc_named_arguments)
 
         {:ok, implementation_logic_address} ->
@@ -727,13 +745,13 @@ defmodule Explorer.Chain.SmartContract do
            json_rpc_named_arguments
          ) do
       {:ok, empty_address}
-      when empty_address in ["0x", "0x0", "0x0000000000000000000000000000000000000000000000000000000000000000", nil] ->
+      when empty_address in ["0x", "0x0", @burn_address_hash_str_32, nil] ->
         fetch_openzeppelin_proxy_implementation(proxy_address_hash, json_rpc_named_arguments)
 
       {:ok, beacon_contract_address} ->
         case beacon_contract_address
              |> abi_decode_address_output()
-             |> get_implementation_address_hash_basic(implementation_method_abi) do
+             |> get_implementation_address_hash_basic("5c60da1b", implementation_method_abi) do
           <<implementation_address::binary-size(42)>> ->
             {:ok, implementation_address}
 
@@ -758,7 +776,7 @@ defmodule Explorer.Chain.SmartContract do
            json_rpc_named_arguments
          ) do
       {:ok, empty_address}
-      when empty_address in ["0x", "0x0", "0x0000000000000000000000000000000000000000000000000000000000000000"] ->
+      when empty_address in ["0x", "0x0", @burn_address_hash_str_32] ->
         {:ok, "0x"}
 
       {:ok, logic_contract_address} ->
@@ -769,18 +787,20 @@ defmodule Explorer.Chain.SmartContract do
     end
   end
 
-  defp get_implementation_address_hash_basic(proxy_address_hash, abi) do
+  defp get_implementation_address_hash_basic(signature, proxy_address_hash, abi) do
+    # supported signatures:
     # 5c60da1b = keccak256(implementation())
+    # aaf10f42 = keccak256(getImplementation())
     implementation_address =
       case Reader.query_contract(
              proxy_address_hash,
              abi,
              %{
-               "5c60da1b" => []
+               "#{signature}" => []
              },
              false
            ) do
-        %{"5c60da1b" => {:ok, [result]}} -> result
+        %{^signature => {:ok, [result]}} -> result
         _ -> nil
       end
 
@@ -800,7 +820,7 @@ defmodule Explorer.Chain.SmartContract do
              json_rpc_named_arguments
            ) do
         {:ok, empty_address}
-        when empty_address in ["0x", "0x0", "0x0000000000000000000000000000000000000000000000000000000000000000"] ->
+        when empty_address in ["0x", "0x0", @burn_address_hash_str_32] ->
           {:ok, "0x"}
 
         {:ok, logic_contract_address} ->
@@ -819,7 +839,7 @@ defmodule Explorer.Chain.SmartContract do
        when empty_address_hash_string in [
               "0x",
               "0x0",
-              "0x0000000000000000000000000000000000000000000000000000000000000000",
+              @burn_address_hash_str_32,
               @burn_address_hash_str
             ] do
     if is_nil(metadata_from_verified_twin) or !metadata_from_verified_twin do

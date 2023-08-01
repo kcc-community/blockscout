@@ -12,7 +12,8 @@ defmodule BlockScoutWeb.API.V2.AddressControllerTest do
     Log,
     Token,
     TokenTransfer,
-    Transaction
+    Transaction,
+    Withdrawal
   }
 
   alias Explorer.Account.WatchlistAddress
@@ -65,7 +66,8 @@ defmodule BlockScoutWeb.API.V2.AddressControllerTest do
         "has_logs" => false,
         "has_tokens" => false,
         "has_token_transfers" => false,
-        "watchlist_address_id" => nil
+        "watchlist_address_id" => nil,
+        "has_beacon_chain_withdrawals" => false
       }
 
       request = get(conn, "/api/v2/addresses/#{Address.checksum(address.hash)}")
@@ -1590,6 +1592,35 @@ defmodule BlockScoutWeb.API.V2.AddressControllerTest do
     end
   end
 
+  describe "/addresses/{address_hash}/withdrawals" do
+    test "get empty list on non existing address", %{conn: conn} do
+      address = build(:address)
+
+      request = get(conn, "/api/v2/addresses/#{address.hash}/withdrawals")
+
+      assert %{"message" => "Not found"} = json_response(request, 404)
+    end
+
+    test "get 422 on invalid address", %{conn: conn} do
+      request = get(conn, "/api/v2/addresses/0x/withdrawals")
+
+      assert %{"message" => "Invalid parameter(s)"} = json_response(request, 422)
+    end
+
+    test "get withdrawals", %{conn: conn} do
+      address = insert(:address, withdrawals: insert_list(51, :withdrawal))
+
+      request = get(conn, "/api/v2/addresses/#{address.hash}/withdrawals")
+      assert response = json_response(request, 200)
+
+      request_2nd_page = get(conn, "/api/v2/addresses/#{address.hash}/withdrawals", response["next_page_params"])
+
+      assert response_2nd_page = json_response(request_2nd_page, 200)
+
+      check_paginated_response(response, response_2nd_page, address.withdrawals)
+    end
+  end
+
   describe "/addresses" do
     test "get empty list", %{conn: conn} do
       request = get(conn, "/api/v2/addresses")
@@ -1697,6 +1728,12 @@ defmodule BlockScoutWeb.API.V2.AddressControllerTest do
     assert to_string(log.data) == json["data"]
     assert Address.checksum(log.address_hash) == json["address"]["hash"]
     assert to_string(log.transaction_hash) == json["tx_hash"]
+    assert json["block_number"] == log.block_number
+    assert json["block_hash"] == to_string(log.block_hash)
+  end
+
+  defp compare_item(%Withdrawal{} = withdrawal, json) do
+    assert withdrawal.index == json["index"]
   end
 
   defp check_paginated_response(first_page_resp, second_page_resp, list) do
@@ -1710,6 +1747,11 @@ defmodule BlockScoutWeb.API.V2.AddressControllerTest do
     compare_item(Enum.at(list, 0), Enum.at(second_page_resp["items"], 0))
   end
 
+  # with the current implementation no transfers should come with list in totals
+  def check_total(%Token{type: nft}, json, _token_transfer) when nft in ["ERC-721", "ERC-1155"] and is_list(json) do
+    false
+  end
+
   def check_total(%Token{type: nft}, json, token_transfer) when nft in ["ERC-1155"] do
     json["token_id"] in Enum.map(token_transfer.token_ids, fn x -> to_string(x) end) and
       json["value"] == to_string(token_transfer.amount)
@@ -1717,11 +1759,6 @@ defmodule BlockScoutWeb.API.V2.AddressControllerTest do
 
   def check_total(%Token{type: nft}, json, token_transfer) when nft in ["ERC-721"] do
     json["token_id"] in Enum.map(token_transfer.token_ids, fn x -> to_string(x) end)
-  end
-
-  # with the current implementation no transfers should come with list in totals
-  def check_total(%Token{type: nft}, json, _token_transfer) when nft in ["ERC-721", "ERC-1155"] and is_list(json) do
-    false
   end
 
   def check_total(_, _, _), do: true

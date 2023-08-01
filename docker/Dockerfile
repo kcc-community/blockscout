@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apk --no-cache --update add alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3 file qemu-x86_64
 
 ENV GLIBC_REPO=https://github.com/sgerrand/alpine-pkg-glibc \
-    GLIBC_VERSION=2.30-r0 \
+    GLIBC_VERSION=2.34-r0 \
     PORT=4000 \
     MIX_ENV="prod" \
     SECRET_KEY_BASE="RMgI4C1HSkxsEjdhtGMfwAHfyT6CKWXOgzCboJflfSm4jeAlic52io05KB6mqzc5"
@@ -19,9 +19,9 @@ RUN set -ex && \
     /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib
 
 ARG CACHE_EXCHANGE_RATES_PERIOD
-ARG DISABLE_READ_API
+ARG API_V1_READ_METHODS_DISABLED
 ARG DISABLE_WEBAPP
-ARG DISABLE_WRITE_API
+ARG API_V1_WRITE_METHODS_DISABLED
 ARG CACHE_TOTAL_GAS_USAGE_COUNTER_ENABLED
 ARG ADMIN_PANEL_ENABLED
 ARG CACHE_ADDRESS_WITH_BALANCES_UPDATE_INTERVAL
@@ -78,4 +78,3 @@ COPY --from=builder /opt/release/blockscout .
 COPY --from=builder /app/apps/explorer/node_modules ./node_modules
 COPY --from=builder /app/config/config_helper.exs ./config/config_helper.exs
 COPY --from=builder /app/config/config_helper.exs /app/releases/${RELEASE_VERSION}/config_helper.exs
-
