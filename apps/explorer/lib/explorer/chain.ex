@@ -1915,7 +1915,7 @@ defmodule Explorer.Chain do
           if smart_contract do
             CheckBytecodeMatchingOnDemand.trigger_check(address_result, smart_contract)
             LookUpSmartContractSourcesOnDemand.trigger_fetch(address_result, smart_contract)
-            address_result
+            ignore_bytecode_change_if_amazon(address_result)
           else
             LookUpSmartContractSourcesOnDemand.trigger_fetch(address_result, nil)
 
@@ -1931,20 +1931,7 @@ defmodule Explorer.Chain do
           address_result
       end
 
-    address_ignored_amazon_bytecode_change =
-      case address_updated_result do
-        %{smart_contract: smart_contract} ->
-          if smart_contract do
-            ignore_bytecodechange_if_amazon(address_updated_result)
-          else
-            address_updated_result
-          end
-
-        _ ->
-          address_updated_result
-      end
-
-    address_ignored_amazon_bytecode_change
+    address_updated_result
     |> case do
       nil -> {:error, :not_found}
       address -> {:ok, address}
@@ -1952,9 +1939,9 @@ defmodule Explorer.Chain do
   end
 
 
-  def ignore_bytecodechange_if_amazon(%{hash: hash, smart_contract: smart_contract} = contract) do
+  def ignore_bytecode_change_if_amazon(%{hash: hash, smart_contract: smart_contract} = contract) do
 
-    # read the list of addresses from the environtment variable "KCC_AMAZON_ADDRESS"
+    # read the list of addresses from the environment variable "KCC_AMAZON_ADDRESS"
     # The format of the list is "address0,address1,address2..." (without quotes)
     # We ignore the change of bytecodes for these addresses.
 
@@ -1971,7 +1958,7 @@ defmodule Explorer.Chain do
     #   smart_contract: %{is_changed_bytecode: true}
     # }
     #
-    # Explorer.Chain.ignore_bytecodechange_if_amazon(c) returns:
+    # Explorer.Chain.ignore_bytecode_change_if_amazon(c) returns:
     #
     # %{
     #   hash: %Explorer.Chain.Hash{
@@ -1984,15 +1971,15 @@ defmodule Explorer.Chain do
     #
 
 
-    amazon_addrs = if System.get_env("KCC_AMAZON_ADDRESS") == nil do
+    amazon_addresses = if System.get_env("KCC_AMAZON_ADDRESS") == nil do
       []
     else
       String.split(System.get_env("KCC_AMAZON_ADDRESS"),",")
       |> Enum.map(fn x -> elem(AddressHash.cast(x),1) end )
     end
 
-    # is hash in amazon_addrs?
-    if Enum.member?(amazon_addrs, hash) do
+    # is hash in amazon_addresses?
+    if Enum.member?(amazon_addresses, hash) do
       Logger.info("Ignoring bytecode change for contract #{hash}")
       contract
       |> Map.put(:smart_contract, Map.put(smart_contract, :is_changed_bytecode, false))
