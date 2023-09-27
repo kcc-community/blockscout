@@ -65,6 +65,8 @@ defmodule Explorer.Chain do
     Withdrawal
   }
 
+  alias Explorer.Chain.Hash.Address, as: AddressHash
+
   alias Explorer.Chain.Block.{EmissionReward, Reward}
 
   alias Explorer.Chain.Cache.{
@@ -1913,7 +1915,7 @@ defmodule Explorer.Chain do
           if smart_contract do
             CheckBytecodeMatchingOnDemand.trigger_check(address_result, smart_contract)
             LookUpSmartContractSourcesOnDemand.trigger_fetch(address_result, smart_contract)
-            address_result
+            ignore_bytecode_change_if_amazon(address_result)
           else
             LookUpSmartContractSourcesOnDemand.trigger_fetch(address_result, nil)
 
@@ -1934,6 +1936,59 @@ defmodule Explorer.Chain do
       nil -> {:error, :not_found}
       address -> {:ok, address}
     end
+  end
+
+
+  def ignore_bytecode_change_if_amazon(%{hash: hash, smart_contract: smart_contract} = contract) do
+
+    # read the list of addresses from the environment variable "KCC_AMAZON_ADDRESS"
+    # The format of the list is "address0,address1,address2..." (without quotes)
+    # We ignore the change of bytecodes for these addresses.
+
+    # Example:
+    #
+    # suppose we have the env: KCC_AMAZON_ADDRESS="0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
+    #
+    # c =  %{
+    #   hash: %Explorer.Chain.Hash{
+    #     byte_count: 20,
+    #     bytes: <<90, 174, 182, 5, 63, 62, 148, 201, 185, 160, 159, 51, 102, 148, 53,
+    #       231, 239, 27, 234, 237>>
+    #   },
+    #   smart_contract: %{is_changed_bytecode: true}
+    # }
+    #
+    # Explorer.Chain.ignore_bytecode_change_if_amazon(c) returns:
+    #
+    # %{
+    #   hash: %Explorer.Chain.Hash{
+    #     byte_count: 20,
+    #     bytes: <<90, 174, 182, 5, 63, 62, 148, 201, 185, 160, 159, 51, 102, 148, 53,
+    #       231, 239, 27, 234, 237>>
+    #   },
+    #   smart_contract: %{is_changed_bytecode: false}
+    # }
+    #
+
+
+    amazon_addresses = if System.get_env("KCC_AMAZON_ADDRESS") == nil do
+      []
+    else
+      String.split(System.get_env("KCC_AMAZON_ADDRESS"),",")
+      |> Enum.map(fn x -> elem(AddressHash.cast(x),1) end )
+    end
+
+    # is hash in amazon_addresses?
+    if Enum.member?(amazon_addresses, hash) do
+      Logger.info("Ignoring bytecode change for contract #{hash}")
+      contract
+      |> Map.put(:smart_contract, Map.put(smart_contract, :is_changed_bytecode, false))
+    else
+      contract
+    end
+
+
+
   end
 
   defp add_twin_info_to_contract(address_result, address_verified_twin_contract, _hash)
